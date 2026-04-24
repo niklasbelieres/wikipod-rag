@@ -63,6 +63,7 @@ zim = Archive(ZIM_FILE)
 all_chunks = []
 
 start_time = time.time()
+total_entries = zim.article_count
 for i in range(zim.article_count):
     try:
         entry = zim._get_entry_by_id(i)
@@ -86,14 +87,14 @@ for i in range(zim.article_count):
             })
 
         if i % 10 == 0:
-            print(f"Processed {i:5d} entries, total chunks: {len(all_chunks):4d}, time: {(time.time() - start_time):5.2f}s")
+            print(f"Processed {i:6d} entries of {total_entries:6d}, total chunks: {len(all_chunks):4d}, time: {(time.time() - start_time):5.2f}s")
 
     except Exception as e:
         print(f"Error at entry {i}: {e}")
         continue
 
 
-# Save to json
+# Save to JSON
 
 with open("chunks.json", "w", encoding="utf-8") as f:
     json.dump(all_chunks, f, ensure_ascii=False, indent=2)
