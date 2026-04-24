@@ -62,10 +62,8 @@ zim = Archive(ZIM_FILE)
 
 all_chunks = []
 
-MAX_ARTICLES = 500
-
 start_time = time.time()
-for i in range(MAX_ARTICLES):
+for i in range(zim.article_count):
     try:
         entry = zim._get_entry_by_id(i)
 
