@@ -1,0 +1,3 @@
+gzip
+bs4
+requests
