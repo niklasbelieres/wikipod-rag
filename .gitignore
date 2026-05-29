@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+
+# Data & indexes (likely large/generated)
+data/
+indexing/
+
+# Evaluation outputs
+evaluation/
+
+# Environment & secrets
+.env
+.env.*
+*.key
+config/secrets*
+
+# Logs & temp
+*.log
+*.tmp
+*.cache
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Requirements lock (keep requirements.txt, ignore compiled)
+requirements.in

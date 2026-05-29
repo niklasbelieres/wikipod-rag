@@ -1,0 +1,6 @@
+libzim
+beautifulsoup4
+numpy
+requests
+sentence-transformers
+click

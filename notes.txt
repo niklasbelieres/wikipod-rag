@@ -1,0 +1,17 @@
+libzim
+bs4
+gzip
+requests
+numpy
+sentencetransformer
+
+-----------------------------------------------------
+
+Data fetching  		    -- skeleton
+Chunking 		        -- skeleton
+Vektorisieren		    -- skeleton
+Open Search indexierung -- missing
+RAG			            -- missing
+
+
+testing 		        -- missing
