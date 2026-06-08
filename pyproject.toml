@@ -1,0 +1,12 @@
+[project]
+name = "wikipod"
+version = "0.1.0"
+
+dependencies = [
+    "libzim",
+    "beautifulsoup4",
+    "numpy",
+    "requests",
+    "sentence-transformers",
+    "click"
+]
