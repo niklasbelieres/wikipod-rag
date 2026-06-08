@@ -4,3 +4,4 @@ numpy
 requests
 sentence-transformers
 click
+pydantic
