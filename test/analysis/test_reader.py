@@ -1,4 +1,5 @@
 from pathlib import Path
+import pytest
 
 from wikipod.analysis.reader import (
     iter_articles,
@@ -13,6 +14,14 @@ ZIM_FILE = (
     / "data"
     / "climate-change-mini.zim"
 )
+
+def test_detects_non_existend_file_path():
+    with pytest.raises(FileNotFoundError):
+        next(iter_articles("non_existend_file.zim"))
+
+def test_detects_wrong_file_type():
+    with pytest.raises(ValueError):
+        next(iter_articles("main.py"))
 
 def test_detects_html_redirect():
     html = """
