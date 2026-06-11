@@ -1,5 +1,5 @@
 libzim
-beautifulsoup4
+bs4
 numpy
 requests
 sentence-transformers

@@ -1,18 +1,72 @@
-from models import  (Article, ArticleMetadata)
+from bs4 import BeautifulSoup
+
+from .models import  (Article, ArticleMetadata)
 
 def extract_metadata(article: Article) -> ArticleMetadata:
-    # yield Article(
-    # article_id=123,
-    # title="Albert Einstein",
-    # html="<html>...</html>")
-    pass
 
-def _count_words(html:str) -> int:
-    pass
+    links = _extract_links(article.html)
+    sections = _extract_sections(article.html)
 
-def _extract_links(html: str) ->list[str]:
-    pass
+    return ArticleMetadata(
+        article_id=article.article_id,
+        title=article.title,
 
+        word_count=_count_words(
+            article.html
+        ),
+
+        link_count=len(links),
+        links=links,
+
+        section_count=len(sections),
+        sections=sections,
+
+        categories=_extract_categories(
+            article.html
+        ),
+    )
+    
+
+def _count_words(html: str) -> int:
+    soup = BeautifulSoup(html, "html.parser")
+
+    content = soup.find(
+        "div",
+        class_="mw-parser-output"
+    )
+
+    if content is None:
+        return 0
+
+    text = content.get_text(
+        " ",
+        strip=True
+    )
+
+    return len(text.split())
+
+def _extract_links(html: str) -> list[str]:
+    soup = BeautifulSoup(html, "html.parser")
+
+    return [
+        link["href"]
+        for link in soup.find_all("a", href=True)
+    ]
+    
+def _extract_sections(html: str) -> list[str]:
+    soup = BeautifulSoup(html, "html.parser")
+
+    return [
+        section.get_text(strip=True)
+        for section in soup.find_all(["h2", "h3"])
+    ]
+
+def _count_sections(html: str) -> int:
+    return len(_extract_sections(html))
+
+def _count_links(html: str) -> int:
+    return len(_extract_links(html))
+ 
 def _extract_categories(html: str) -> list[str]:
-    pass
+    return []
     

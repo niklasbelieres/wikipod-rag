@@ -7,8 +7,8 @@ def iter_articles(zim_path: str) -> Iterator[Article]:
     if not Path(zim_path).exists():
         raise FileNotFoundError(f"File {zim_path} does not exist")
     
-    # if not zim_path.endswith(".zim"):
-    #     raise ValueError(f"File {zim_path} is not a .zim file")
+    if not str(zim_path).endswith(".zim"):
+        raise ValueError(f"File {zim_path} is not a .zim file")
     
     archive = Archive(zim_path)
     
