@@ -10,6 +10,11 @@ class ArticleMetadata(BaseModel):
     title: str
 
     word_count: int
+    
     link_count: int
+    links: list[str]
+    
+    section_count: int
+    sections: list[str]
     
     categories: list[str]
