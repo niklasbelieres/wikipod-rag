@@ -24,16 +24,11 @@ def summarize_articles(articles: list[ArticleMetadata]):
         "max_link_count": max_links_count
     }
 
-def top_linked_articles(articles: list[ArticleMetadata], limit=20):
-    #     [
-    #     ("Physics", 4500),
-    #     ("Mathematics", 3900)
-    # ]
+def link_frequency_map(articles: list[ArticleMetadata]) -> dict[str, int]:
     counter = Counter()
-    i = 0
+    
     for article in articles:
-        for link in article.links:
-            counter.update([link])
-        
-    return counter.most_common(limit)
+        counter.update(article.links)
+    
+    return dict(counter)
 
