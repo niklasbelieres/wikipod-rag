@@ -48,10 +48,22 @@ def _count_words(html: str) -> int:
 def _extract_links(html: str) -> list[str]:
     soup = BeautifulSoup(html, "html.parser")
 
-    return [
-        link["href"]
-        for link in soup.find_all("a", href=True)
-    ]
+    if soup is None:
+        return []
+
+    links = []
+
+    for link in soup.find_all("a", href=True):
+        href = link["href"]
+
+        if href.startswith("http"):
+            continue
+
+        if href.startswith("./"):
+            continue
+
+        links.append(href)
+    return links
     
 def _extract_sections(html: str) -> list[str]:
     soup = BeautifulSoup(html, "html.parser")
