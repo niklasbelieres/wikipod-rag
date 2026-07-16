@@ -13,7 +13,8 @@ from wikipod.analysis.reader import (
 )
 
 from wikipod.analysis.models import (
-    ArticleMetadata
+    ArticleMetadata,
+    Article
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -97,10 +98,17 @@ def test_extract_sections_returns_h2_and_h3_titles():
         <p>...</p>
 
         <h2>Future</h2>
+        <p>...</p>
     </div>
     """
+    article = Article(
+        article_id=1,
+        title="Hello_World",
+        html=html
+    )
     
-    sections = _extract_sections(html)
+    sections = _extract_sections(article)
+    sections = [section.section_title for section in sections]
     
     assert sections == [
         "History",
@@ -116,7 +124,21 @@ def test_extract_sections_returns_empty_list_when_no_sections_exist():
     </div>
     """
     
-    assert _extract_sections(html) == []
+    article = Article(
+        article_id=1,
+        title="Hello_World",
+        html=html
+    )
+    
+    sections = _extract_sections(article)
+    
+    assert len(sections) == 1
+    
+    assert sections[0].section_title == "Lead"
+    assert sections[0].text == "Only text"
+    assert sections[0].article_id == 1
+    assert sections[0].article_title == "Hello_World"
+    
 
 def test_count_sections_matches_number_of_extracted_sections():
     html = """
@@ -127,9 +149,15 @@ def test_count_sections_matches_number_of_extracted_sections():
     </div>
     """
     
-    sections = _extract_sections(html)
+    article = Article(
+        article_id=1,
+        title="Hello_World",
+        html=html
+    )
     
-    assert len(sections) == _count_sections(html)
+    sections = _extract_sections(article)
+    
+    assert len(sections) == _count_sections(article)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -175,7 +203,7 @@ def test_extract_metadata_populates_section_count():
 
     metadata = extract_metadata(article)
 
-    assert metadata.sections == _extract_sections(article.html)
+    assert metadata.sections == _extract_sections(article)
     assert metadata.section_count == len(metadata.sections)
 
 def test_extract_metadata_returns_article_metadata_instance():

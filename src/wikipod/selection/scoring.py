@@ -10,10 +10,13 @@ def score_article(article: ArticleMetadata, link_frequencies: dict[str, int]) ->
     importance_score = sum(
         math.log1p(link_frequencies.get(link, 0))for link in article.links
     )
+    
+    incoming_links_score = math.log1p(link_frequencies.get(article.title,0))
 
     return (
-        0.3 * word_score +
+        0.2 * word_score +
         0.2 * link_score +
-        0.5 * importance_score
+        0.2 * importance_score +
+        0.4 * incoming_links_score
     )
     

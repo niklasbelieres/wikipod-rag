@@ -34,3 +34,8 @@ print(
     f"Avg links: "
     f"{sum(m.link_count for m in all_metadata) / len(all_metadata):.2f}"
 )
+
+print(
+    f"AVG. Sections: "
+    f"{sum(m.section_count for m in all_metadata) / len(all_metadata):.2f}"
+)
