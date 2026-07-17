@@ -1,12 +1,52 @@
 [project]
 name = "wikipod"
-version = "0.1.0"
-
+version = "0.2.0"
+description = "Offline Wikipedia access with subset selection and Retrieval-Augmented Generation for constrained hardware (Raspberry Pi 5)."
+requires-python = ">=3.11"
 dependencies = [
-    "libzim",
-    "beautifulsoup4",
-    "numpy",
-    "requests",
-    "sentence-transformers",
-    "click"
+    "libzim>=3.6",
+    "beautifulsoup4>=4.12",
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+    "numpy>=1.26",
+    "requests>=2.31",
+    "sentence-transformers>=3.0",
+    "opensearch-py>=2.6",
+    "click>=8.1",
+    "rich>=13.7",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+]
+llm = [
+    "llama-cpp-python>=0.2",
+]
+
+[project.scripts]
+wikipod = "wikipod.cli:cli"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "test"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true

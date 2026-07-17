@@ -16,12 +16,7 @@ ZIM_FILE = (
 
 def main():
 
-    count = 0
     for article in iter_articles(ZIM_FILE):
-        if count > 10:
-            break
-        count += 1
-
         metadata = extract_metadata(article)
         chunks = chunk_article(metadata)
 

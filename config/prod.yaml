@@ -1,0 +1,16 @@
+# Overrides for the target deployment (Raspberry Pi 5, 16 GB RAM, 1 TB SSD).
+
+paths:
+  zim_file: "/data/raw/wikipedia_en_all.zim"
+  data_dir: "/data"
+
+selection:
+  storage_budget_mb: 200000 # ~200 GB, leaves headroom on the 1 TB SSD
+
+opensearch:
+  host: "localhost"
+  port: 9200
+
+llm:
+  backend: "llama_cpp"
+  model_path: "/data/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"

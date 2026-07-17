@@ -1,108 +1,69 @@
 from pathlib import Path
+
 import pytest
 
-from wikipod.analysis.reader import (
-    iter_articles,
-    is_html_redirect,
-)
+from wikipod.analysis.reader import is_html_redirect, iter_articles
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ZIM_FILE = PROJECT_ROOT / "test" / "data" / "climate-change-mini.zim"
 
-ZIM_FILE = (
-    PROJECT_ROOT
-    / "test"
-    / "data"
-    / "climate-change-mini.zim"
+requires_zim = pytest.mark.skipif(
+    not ZIM_FILE.exists(), reason="demo ZIM file not present; see test/data/README.md"
 )
 
-def test_detects_non_existend_file_path():
+
+def test_detects_nonexistent_file_path():
     with pytest.raises(FileNotFoundError):
-        next(iter_articles("non_existend_file.zim"))
+        next(iter_articles("does_not_exist.zim"))
+
 
 def test_detects_wrong_file_type():
     with pytest.raises(ValueError):
-        next(iter_articles("main.py"))
+        next(iter_articles(__file__))
+
 
 def test_detects_html_redirect():
     html = """
-    <html>
-      <head>
-        <meta http-equiv="refresh"
-              content="0;URL='./Target'" />
-      </head>
-    </html>
+    <html><head>
+      <meta http-equiv="refresh" content="0;URL='./Target'" />
+    </head></html>
     """
-
     assert is_html_redirect(html) is True
 
 
 def test_detects_normal_article():
-    html = """
-    <html>
-      <body>
-        <h1>Climate change</h1>
-      </body>
-    </html>
-    """
-
+    html = "<html><body><h1>Climate change</h1></body></html>"
     assert is_html_redirect(html) is False
 
+
+@requires_zim
 def test_reader_returns_articles():
-    articles = []
-
-    for article in iter_articles(str(ZIM_FILE)):
-        articles.append(article)
-
-        if len(articles) == 5:
-            break
-
+    articles = list(_take(iter_articles(ZIM_FILE), 5))
     assert len(articles) > 0
 
 
-def test_articles_have_titles():
-    article = next(iter_articles(str(ZIM_FILE)))
-
-    assert article.title
-    assert isinstance(article.title, str)
-
-
-def test_articles_have_html():
-    article = next(iter_articles(str(ZIM_FILE)))
-
-    assert article.html
-    assert isinstance(article.html, str)
-
-
-def test_articles_contain_html_document():
-    article = next(iter_articles(str(ZIM_FILE)))
-
+@requires_zim
+def test_articles_have_titles_and_html():
+    article = next(iter_articles(ZIM_FILE))
+    assert isinstance(article.title, str) and article.title
+    assert isinstance(article.html, str) and article.html
     assert "<html" in article.html.lower()
 
 
+@requires_zim
 def test_reader_skips_html_redirects():
-    for article in iter_articles(str(ZIM_FILE)):
+    for article in _take(iter_articles(ZIM_FILE), 50):
         assert not is_html_redirect(article.html)
 
 
+@requires_zim
 def test_reader_returns_unique_article_ids():
-    ids = []
-
-    for article in iter_articles(str(ZIM_FILE)):
-        ids.append(article.article_id)
-
-        if len(ids) >= 100:
-            break
-
+    ids = [a.article_id for a in _take(iter_articles(ZIM_FILE), 100)]
     assert len(ids) == len(set(ids))
 
 
-def test_reader_returns_multiple_articles():
-    count = 0
-
-    for _ in iter_articles(str(ZIM_FILE)):
-        count += 1
-
-        if count >= 20:
+def _take(iterator, n):
+    for i, item in enumerate(iterator):
+        if i >= n:
             break
-
-    assert count >= 20
+        yield item

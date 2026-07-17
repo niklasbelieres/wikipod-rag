@@ -1,0 +1,43 @@
+# Base configuration. Values here are overridden by config/dev.yaml or
+# config/prod.yaml depending on WIKIPOD_ENV (defaults to "dev").
+
+paths:
+  zim_file: "test/data/climate-change-mini.zim"
+  pageviews_file: null # optional path to a Wikipedia pageviews dump (see selection/pageviews.py)
+  data_dir: "data"
+
+selection:
+  storage_budget_mb: 500
+  weights:
+    word_count: 0.2
+    link_count: 0.2
+    importance: 0.2
+    incoming_links: 0.4
+    pageviews: 0.0 # set > 0 once a pageviews file is configured
+
+chunking:
+  max_words: 250
+  overlap: 40
+
+embeddings:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  batch_size: 32
+  dimension: 384
+
+opensearch:
+  host: "localhost"
+  port: 9200
+  use_ssl: false
+  verify_certs: false
+  index_name: "wikipod-chunks"
+
+llm:
+  backend: "llama_cpp" # "llama_cpp" | "ollama"
+  model_path: "models/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+  ollama_model: "qwen2.5:1.5b"
+  ollama_host: "http://localhost:11434"
+  max_tokens: 400
+  temperature: 0.2
+
+retrieval:
+  top_k: 5

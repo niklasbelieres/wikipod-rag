@@ -18,12 +18,15 @@ env/
 .idea/
 .vscode/
 
-# Data & indexes (likely large/generated)
+# Data, indexes, models (large/generated)
 data/
 indexing/
+models/
+*.zim
+*.gguf
 
 # Evaluation outputs
-evaluation/
+evaluation/output/
 
 # Environment & secrets
 .env

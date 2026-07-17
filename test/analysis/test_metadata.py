@@ -1,214 +1,127 @@
 from pathlib import Path
 
-from wikipod.analysis.metadata import (
-    extract_metadata,
-    _count_words,
-    _extract_links,
-    _count_links,
-    _extract_sections,
-    _count_sections
-)
-from wikipod.analysis.reader import (
-    iter_articles
-)
+import pytest
 
-from wikipod.analysis.models import (
-    ArticleMetadata,
-    Article
+from wikipod.analysis.html_utils import (
+    extract_categories,
+    extract_links,
+    get_content_root,
+    split_into_sections,
 )
+from wikipod.analysis.metadata import extract_metadata
+from wikipod.analysis.models import Article, ArticleMetadata
+from wikipod.analysis.reader import iter_articles
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ZIM_FILE = PROJECT_ROOT / "test" / "data" / "climate-change-mini.zim"
 
-ZIM_FILE = (
-    PROJECT_ROOT
-    / "test"
-    / "data"
-    / "climate-change-mini.zim"
-)
 
-def test_count_words_returns_positive_number():
-    html = """
-    <div class="mw-parser-output">
-        <p>Hello world</p>
-        <p>This is a test</p>
-    </div>
-    """
-    
-    assert _count_words(html) == 6
-    
+# -- html_utils --------------------------------------------------------------
 
-def test_count_words_returns_zero_when_content_div_missing():
-    html = """
-    <html>
-        <body>
-            <p>Hello world</p>
-        </body>
-    </html>
-    """
-    
-    assert _count_words(html) == 0
 
-def test_extract_links_returns_all_links():
+def test_extract_links_returns_internal_links_only():
     html = """
     <div class="mw-parser-output">
         <a href="Article_A">A</a>
-        <a href="Article_B">B</a>
+        <a href="https://example.com">external</a>
+        <a href="./Article_B">also skipped</a>
         <a href="Article_C">C</a>
     </div>
     """
-    
-    links = _extract_links(html)
+    root = get_content_root(html)
+    assert extract_links(root) == ["Article_A", "Article_C"]
 
-    assert links == [
-        "Article_A",
-        "Article_B",
-        "Article_C",
-    ]
 
 def test_extract_links_returns_empty_list_when_no_links_exist():
+    html = '<div class="mw-parser-output"><p>No links here</p></div>'
+    assert extract_links(get_content_root(html)) == []
+
+
+def test_split_into_sections_returns_h2_and_h3_titles():
     html = """
     <div class="mw-parser-output">
-        <p>No links here</p>
+        <h2>History</h2><p>...</p>
+        <h3>Europe</h3><p>...</p>
+        <h2>Future</h2><p>...</p>
     </div>
     """
-    
-    links = _extract_links(html)
-    
-    assert links == []
+    titles = [title for title, _ in split_into_sections(get_content_root(html))]
+    assert titles == ["History", "Europe", "Future"]
 
-def test_count_links_matches_number_of_extracted_links():
+
+def test_split_into_sections_groups_leading_text_as_lead():
+    html = '<div class="mw-parser-output"><p>Only text</p></div>'
+    sections = split_into_sections(get_content_root(html))
+    assert sections == [("Lead", "Only text")]
+
+
+def test_extract_categories_reads_catlinks_box():
     html = """
-    <div class="mw-parser-output">
-        <a href="A">A</a>
-        <a href="B">B</a>
-        <a href="C">C</a>
-    </div>
+    <html><body>
+      <div class="mw-parser-output"><p>Body</p></div>
+      <div id="catlinks">
+        <a href="../Category:Climate_change">Climate change</a>
+        <a href="../Category:Physics">Physics</a>
+      </div>
+    </body></html>
     """
-    
-    links = _extract_links(html)
-    assert _count_links(html) == len(links)
+    assert extract_categories(html) == ["Climate change", "Physics"]
 
-def test_extract_sections_returns_h2_and_h3_titles():
+
+def test_extract_categories_returns_empty_list_when_absent():
+    html = '<div class="mw-parser-output"><p>No categories</p></div>'
+    assert extract_categories(html) == []
+
+
+# -- metadata.extract_metadata (in-memory, no ZIM required) ------------------
+
+
+def test_extract_metadata_from_synthetic_article():
     html = """
-    <div class="mw-parser-output">
-        <h2>History</h2>
-        <p>...</p>
-
-        <h3>Europe</h3>
-        <p>...</p>
-
-        <h2>Future</h2>
-        <p>...</p>
-    </div>
+    <html><body>
+      <div class="mw-parser-output">
+        <p>Climate change refers to long term shifts.</p>
+        <h2>Causes</h2>
+        <p>Human activity is the main driver.</p>
+        <a href="Greenhouse_gas">link</a>
+      </div>
+      <div id="catlinks"><a href="../Category:Climate">Climate</a></div>
+    </body></html>
     """
-    article = Article(
-        article_id=1,
-        title="Hello_World",
-        html=html
-    )
-    
-    sections = _extract_sections(article)
-    sections = [section.section_title for section in sections]
-    
-    assert sections == [
-        "History",
-        "Europe",
-        "Future",
-    ]
-    
-
-def test_extract_sections_returns_empty_list_when_no_sections_exist():
-    html = """
-    <div class="mw-parser-output">
-        <p>Only text</p>
-    </div>
-    """
-    
-    article = Article(
-        article_id=1,
-        title="Hello_World",
-        html=html
-    )
-    
-    sections = _extract_sections(article)
-    
-    assert len(sections) == 1
-    
-    assert sections[0].section_title == "Lead"
-    assert sections[0].text == "Only text"
-    assert sections[0].article_id == 1
-    assert sections[0].article_title == "Hello_World"
-    
-
-def test_count_sections_matches_number_of_extracted_sections():
-    html = """
-    <div class="mw-parser-output">
-        <h2>History</h2>
-        <h2>Future</h2>
-        <h3>Europe</h3>
-    </div>
-    """
-    
-    article = Article(
-        article_id=1,
-        title="Hello_World",
-        html=html
-    )
-    
-    sections = _extract_sections(article)
-    
-    assert len(sections) == _count_sections(article)
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-ZIM_FILE = (
-    PROJECT_ROOT
-    / "test"
-    / "data"
-    / "climate-change-mini.zim"
-)
-
-def test_extract_metadata_preserves_article_id():
-    article = next(iter_articles(ZIM_FILE))
-    
-    metadata = extract_metadata(article)
-    
-    assert metadata.article_id == article.article_id
-    assert metadata.title == article.title
-
-def test_extract_metadata_preserves_title():
-    article = next(iter_articles(ZIM_FILE))
-
-    metadata = extract_metadata(article)
-
-    assert metadata.title == article.title
-
-def test_extract_metadata_populates_word_count():
-    article = next(iter_articles(ZIM_FILE))
-
-    metadata = extract_metadata(article)
-
-    assert metadata.word_count > 0
-
-def test_extract_metadata_populates_links():
-    article = next(iter_articles(ZIM_FILE))
-
-    metadata = extract_metadata(article)
-
-    assert metadata.links == _extract_links(article.html)
-    assert metadata.link_count == len(metadata.links)
-
-def test_extract_metadata_populates_section_count():
-    article = next(iter_articles(ZIM_FILE))
-
-    metadata = extract_metadata(article)
-
-    assert metadata.sections == _extract_sections(article)
-    assert metadata.section_count == len(metadata.sections)
-
-def test_extract_metadata_returns_article_metadata_instance():
-    article = next(iter_articles(ZIM_FILE))
-
+    article = Article(article_id=1, title="Climate change", html=html)
     metadata = extract_metadata(article)
 
     assert isinstance(metadata, ArticleMetadata)
+    assert metadata.article_id == 1
+    assert metadata.title == "Climate change"
+    assert metadata.word_count > 0
+    assert metadata.links == ["Greenhouse_gas"]
+    assert metadata.link_count == 1
+    assert metadata.section_count == 2  # Lead + Causes
+    assert metadata.categories == ["Climate"]
+    assert metadata.html_size_bytes == len(html.encode("utf-8"))
+
+
+def test_extract_metadata_handles_missing_content_root():
+    article = Article(article_id=2, title="Empty", html="<html><body></body></html>")
+    metadata = extract_metadata(article)
+
+    assert metadata.word_count == 0
+    assert metadata.links == []
+    assert metadata.sections == []
+
+
+# -- integration against the real demo ZIM, if present -----------------------
+
+
+@pytest.mark.skipif(
+    not ZIM_FILE.exists(), reason="demo ZIM file not present; see test/data/README.md"
+)
+def test_extract_metadata_on_real_article_is_internally_consistent():
+    article = next(iter_articles(ZIM_FILE))
+    metadata = extract_metadata(article)
+
+    assert metadata.article_id == article.article_id
+    assert metadata.title == article.title
+    assert metadata.link_count == len(metadata.links)
+    assert metadata.section_count == len(metadata.sections)
