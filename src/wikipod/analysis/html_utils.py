@@ -89,12 +89,32 @@ def extract_links(root: Tag | None) -> list[str]:
     return links
 
 
+def _iter_content_nodes(tag: Tag):
+    """Yield heading/paragraph/list children, transparently unwrapping <section>.
+
+    Parsoid-rendered ZIM HTML (the format modern Kiwix dumps use) wraps each
+    heading's content in a `<section data-mw-section-id="...">`, nested per
+    subsection, instead of putting headings and paragraphs side by side as
+    direct children of `mw-parser-output`. Unwrapping `<section>` here lets the
+    rest of `split_into_sections` keep using simple direct-child iteration for
+    everything else, so nested lists still can't cause double-counted text.
+    """
+    for child in tag.find_all(recursive=False):
+        if not isinstance(child, Tag):
+            continue
+        if child.name == "section":
+            yield from _iter_content_nodes(child)
+        else:
+            yield child
+
+
 def split_into_sections(root: Tag | None) -> list[tuple[str, str]]:
     """Split cleaned content into (section_title, section_text) pairs.
 
     Text before the first heading is grouped under "Lead". Only direct
-    children are inspected, so nested headings inside e.g. infoboxes (already
-    stripped) can't create spurious sections.
+    children (after unwrapping `<section>` wrappers, see `_iter_content_nodes`)
+    are inspected, so nested headings inside e.g. infoboxes (already stripped)
+    can't create spurious sections.
     """
     if root is None:
         return []
@@ -108,10 +128,7 @@ def split_into_sections(root: Tag | None) -> list[tuple[str, str]]:
         if text:
             sections.append((current_title, text))
 
-    for child in root.find_all(recursive=False):
-        if not isinstance(child, Tag):
-            continue
-
+    for child in _iter_content_nodes(root):
         if child.name in ("h2", "h3"):
             flush()
             buffer.clear()
