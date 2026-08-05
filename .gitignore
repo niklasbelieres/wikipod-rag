@@ -18,15 +18,16 @@ env/
 .idea/
 .vscode/
 
-# Data, indexes, models (large/generated)
-data/
-indexing/
-models/
+# Data, indexes, models (large/generated) -- rooted so these don't also match
+# source packages like src/wikipod/indexing/
+/data/
+/indexing/
+/models/
 *.zim
 *.gguf
 
 # Evaluation outputs
-evaluation/output/
+/evaluation/output/
 
 # Environment & secrets
 .env
