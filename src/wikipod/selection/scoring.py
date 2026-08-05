@@ -23,6 +23,7 @@ import math
 
 from wikipod.analysis.models import ArticleMetadata
 from wikipod.config import SelectionWeights
+from wikipod.selection.pageviews import get_views
 
 
 def score_article(
@@ -38,7 +39,7 @@ def score_article(
     link_score = math.log1p(article.link_count)
     importance_score = sum(math.log1p(link_frequencies.get(link, 0)) for link in article.links)
     incoming_links_score = math.log1p(link_frequencies.get(article.title, 0))
-    pageviews_score = math.log1p(pageviews.get(article.title, 0))
+    pageviews_score = math.log1p(get_views(pageviews, article.title))
 
     return (
         weights.word_count * word_score
