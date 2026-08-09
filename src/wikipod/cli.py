@@ -1,12 +1,10 @@
 """Command-line entry point for the WikiPod pipeline.
 
 Wraps the analysis -> selection -> chunking -> embedding -> indexing pipeline
-behind `wikipod index`, and ad-hoc retrieval against an already-built index
-behind `wikipod query`. Both commands are driven by the merged config from
-`wikipod.config` (see `config/default.yaml`, overridden per `WIKIPOD_ENV`).
-
-Generation (`rag/generator.py`) isn't wired in yet, so `query` only shows
-the retrieved chunks, not a synthesized answer.
+behind `wikipod index`, and retrieval + answer generation against an
+already-built index behind `wikipod query`. Both commands are driven by the
+merged config from `wikipod.config` (see `config/default.yaml`, overridden
+per `WIKIPOD_ENV`).
 """
 
 from __future__ import annotations
@@ -23,6 +21,8 @@ from wikipod.config import get_config
 from wikipod.embeddings.embedder import Embedder
 from wikipod.indexing.opensearch_client import build_client, create_index, index_chunks
 from wikipod.rag.retriever import Retriever
+from wikipod.rag.prompt_builder import build_messages
+from wikipod.rag.generator import Generator
 from wikipod.selection.pageviews import load_pageviews
 from wikipod.selection.selector import select_within_budget
 
@@ -92,8 +92,11 @@ def index(recreate_index: bool) -> None:
 @cli.command()
 @click.argument("text")
 @click.option("--top-k", default=None, type=int, help="Override config.retrieval.top_k.")
-def query(text: str, top_k: int | None) -> None:
-    """Retrieve the top-k chunks most relevant to TEXT (no LLM generation yet)."""
+@click.option(
+    "--chunks-only", is_flag=True, help="Only show retrieved chunks, skip LLM generation."
+)
+def query(text: str, top_k: int | None, chunks_only: bool) -> None:
+    """Retrieve the top-k chunks most relevant to TEXT and generate an answer."""
     config = get_config()
     embedder = Embedder(config.embeddings.model_name)
     client = build_client(config.opensearch)
@@ -111,6 +114,13 @@ def query(text: str, top_k: int | None) -> None:
         preview = chunk.text[:120] + ("..." if len(chunk.text) > 120 else "")
         table.add_row(chunk.article_title, chunk.section_title, preview)
     console.print(table)
+
+    if chunks_only:
+        return
+
+    messages = build_messages(text, chunks)
+    answer = Generator(config.llm).generate(messages)
+    console.print(f"\n[bold]Answer:[/bold] {answer}")
 
 
 if __name__ == "__main__":
