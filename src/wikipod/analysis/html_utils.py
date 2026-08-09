@@ -58,7 +58,7 @@ def extract_categories(html: str) -> list[str]:
 
     Kiwix/MediaWiki renders categories as links such as
     ``<a href="../Category:Climate_change">Climate change</a>`` in a
-    `div#catlinks`, which sits *outside* `mw-parser-output`, so this parses
+    `div#catlinks`, which sits outside `mw-parser-output`, so this parses
     the full document rather than the cleaned content root.
     """
     soup = BeautifulSoup(html, "html.parser")
