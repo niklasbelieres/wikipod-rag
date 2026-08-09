@@ -5,3 +5,6 @@ selection:
 
 opensearch:
   index_name: "wikipod-chunks-dev"
+
+llm:
+  backend: ollama

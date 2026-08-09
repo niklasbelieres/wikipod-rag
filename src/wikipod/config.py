@@ -68,6 +68,7 @@ class LLMConfig(BaseModel):
     ollama_host: str = "http://localhost:11434"
     max_tokens: int = 400
     temperature: float = 0.2
+    n_ctx: int = 4096  # llama_cpp only; must cover system prompt + context + max_tokens
 
 
 class RetrievalConfig(BaseModel):

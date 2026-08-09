@@ -38,6 +38,7 @@ llm:
   ollama_host: "http://localhost:11434"
   max_tokens: 400
   temperature: 0.2
+  n_ctx: 4096
 
 retrieval:
   top_k: 5
