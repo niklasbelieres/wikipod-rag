@@ -30,7 +30,6 @@ SYSTEM_PROMPT = (
 # config.llm.max_tokens (default 400) worth of output are accounted for.
 DEFAULT_MAX_CONTEXT_WORDS = 800
 
-
 def format_context(chunks: list[Chunk]) -> str:
     """Render retrieved chunks as a numbered, source-attributed context block.
 
