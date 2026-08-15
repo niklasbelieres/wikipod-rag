@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from wikipod.analysis.reader import is_html_redirect, iter_articles
+from wikipod.analysis.metadata import extract_metadata
+from wikipod.analysis.reader import (
+    is_html_redirect,
+    iter_articles,
+    read_articles_metadata_parallel,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ZIM_FILE = PROJECT_ROOT / "test" / "data" / "climate-change-mini.zim"
@@ -67,3 +72,33 @@ def _take(iterator, n):
         if i >= n:
             break
         yield item
+
+
+def test_read_articles_metadata_parallel_detects_nonexistent_file_path():
+    with pytest.raises(FileNotFoundError):
+        read_articles_metadata_parallel("does_not_exist.zim")
+
+
+def test_read_articles_metadata_parallel_detects_wrong_file_type():
+    with pytest.raises(ValueError):
+        read_articles_metadata_parallel(__file__)
+
+
+@requires_zim
+def test_read_articles_metadata_parallel_matches_sequential_result():
+    sequential = [extract_metadata(a) for a in iter_articles(ZIM_FILE)]
+
+    parallel = read_articles_metadata_parallel(ZIM_FILE, workers=2)
+
+    assert len(parallel) == len(sequential)
+    assert {a.article_id for a in parallel} == {a.article_id for a in sequential}
+
+
+@requires_zim
+def test_read_articles_metadata_parallel_returns_article_metadata_instances():
+    articles = read_articles_metadata_parallel(ZIM_FILE, workers=2)
+
+    assert len(articles) > 0
+    first = articles[0]
+    assert isinstance(first.title, str) and first.title
+    assert first.word_count >= 0

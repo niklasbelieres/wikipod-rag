@@ -14,7 +14,7 @@ from rich.console import Console
 from rich.table import Table
 
 from wikipod.analysis.metadata import extract_metadata
-from wikipod.analysis.reader import iter_articles
+from wikipod.analysis.reader import read_articles_metadata_parallel
 from wikipod.analysis.statistics import link_frequency_map
 from wikipod.chunking.chunker import chunk_article
 from wikipod.config import get_config
@@ -38,13 +38,14 @@ def cli() -> None:
 @click.option(
     "--recreate-index", is_flag=True, help="Drop and recreate the OpenSearch index first."
 )
-def index(recreate_index: bool) -> None:
+@click.option("--workers", default=None, type=int, help="Parallel workers for reading (default: all cores).")
+def index(recreate_index: bool, workers: int) -> None:
     """Select articles within budget, chunk, embed and index them into OpenSearch."""
     config = get_config()
     zim_path = config.resolve_path(config.paths.zim_file)
 
     console.print(f"[bold]Reading articles from[/bold] {zim_path}")
-    articles = [extract_metadata(a) for a in iter_articles(zim_path)]
+    articles = read_articles_metadata_parallel(zim_path, workers)
     console.print(f"Read {len(articles)} articles")
 
     link_frequencies = link_frequency_map(articles)
