@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import click
 from rich.console import Console
+from rich.progress import Progress
 from rich.table import Table
 
 from wikipod.analysis.metadata import extract_metadata
@@ -48,11 +49,21 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
     zim_path = config.resolve_path(config.paths.zim_file)
 
     console.print(f"[bold]Reading articles from[/bold] {zim_path}")
-    if no_cache:
-        articles = read_articles_metadata_parallel(zim_path, workers)
-    else:
-        cache_path = config.resolve_path(config.paths.data_dir) / f"{zim_path.stem}_metadata_cache.pkl"
-        articles = read_articles_metadata_cached(zim_path, cache_path, workers)
+    with Progress(console=console) as progress:
+        task = progress.add_task("Reading articles", total=None)
+
+        def on_progress(done: int, total: int) -> None:
+            progress.update(task, completed=done, total=total)
+
+        if no_cache:
+            articles = read_articles_metadata_parallel(zim_path, workers, on_progress=on_progress)
+        else:
+            cache_path = (
+                config.resolve_path(config.paths.data_dir) / f"{zim_path.stem}_metadata_cache.pkl"
+            )
+            articles = read_articles_metadata_cached(
+                zim_path, cache_path, workers, on_progress=on_progress
+            )
     console.print(f"Read {len(articles)} articles")
 
     link_frequencies = link_frequency_map(articles)
@@ -89,10 +100,13 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
 
     indexed = 0
     batch_size = config.embeddings.batch_size
-    for start in range(0, len(chunks), batch_size):
-        batch = chunks[start : start + batch_size]
-        vectors = embedder.embed_chunks(batch)
-        indexed += index_chunks(client, config.opensearch.index_name, batch, vectors)
+    with Progress(console=console) as progress:
+        task = progress.add_task("Embedding & indexing", total=len(chunks))
+        for start in range(0, len(chunks), batch_size):
+            batch = chunks[start : start + batch_size]
+            vectors = embedder.embed_chunks(batch)
+            indexed += index_chunks(client, config.opensearch.index_name, batch, vectors)
+            progress.update(task, completed=min(start + batch_size, len(chunks)))
 
     console.print(f"[green]Indexed {indexed} chunks into '{config.opensearch.index_name}'[/green]")
 

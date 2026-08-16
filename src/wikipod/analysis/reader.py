@@ -3,10 +3,11 @@ Reads articles out of a KIWIX .zim archive.
 """
 
 import logging
+import multiprocessing
 import os
 import pickle
-from collections.abc import Iterator
-from concurrent.futures import ProcessPoolExecutor
+from collections.abc import Callable, Iterator
+from concurrent.futures import ProcessPoolExecutor, wait
 from pathlib import Path
 
 from libzim.reader import Archive
@@ -60,16 +61,33 @@ def is_html_redirect(html: str) -> bool:
     return 'http-equiv="refresh"' in html and "URL=" in html
 
 
-def _extract_metadata_range(zim_path: str, start: int, end: int) -> list[ArticleMetadata]:
+def _extract_metadata_range(
+    zim_path: str,
+    start: int,
+    end: int,
+    counter=None,
+    lock=None,
+    report_every: int = 50,
+) -> list[ArticleMetadata]:
     """Worker target: extract metadata for article ids in [start, end).
 
     Opens its own `Archive` handle rather than sharing one across processes --
     libzim's `Archive` wraps a C-extension object and isn't picklable, so each
     worker needs its own. ZIM files are read-only, so multiple independent
     handles on the same file are safe.
+
+    `counter`/`lock` (proxies from a `multiprocessing.Manager`, *not* plain
+    `multiprocessing.Value`/`Lock` -- those can only be inherited via fork,
+    not passed through `ProcessPoolExecutor.submit()`, which breaks under the
+    `spawn` start method macOS/Windows default to) are optional; when given,
+    progress is reported in batches of `report_every` articles rather than
+    after every single one, since each update is an IPC round-trip to the
+    manager process -- doing that per-article would add real overhead across
+    a multi-million-article corpus.
     """
     archive = Archive(zim_path)
     results: list[ArticleMetadata] = []
+    pending_count = 0
 
     for article_id in range(start, end):
         try:
@@ -88,12 +106,24 @@ def _extract_metadata_range(zim_path: str, start: int, end: int) -> list[Article
             results.append(extract_metadata(article))
         except Exception:
             logger.warning("Skipping article %s", article_id, exc_info=True)
+        finally:
+            pending_count += 1
+            if counter is not None and pending_count >= report_every:
+                with lock:
+                    counter.value += pending_count
+                pending_count = 0
+
+    if counter is not None and pending_count:
+        with lock:
+            counter.value += pending_count
 
     return results
 
 
 def read_articles_metadata_parallel(
-    zim_path: str | Path, workers: int | None = None
+    zim_path: str | Path,
+    workers: int | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> list[ArticleMetadata]:
     """Read every non-redirect article and extract its metadata, in parallel.
 
@@ -101,6 +131,11 @@ def read_articles_metadata_parallel(
     combined, just split across `workers` processes -- HTML parsing is
     CPU-bound pure Python, so `ProcessPoolExecutor` (real parallelism) is
     used instead of threads (which the GIL would block from helping here).
+
+    `on_progress`, if given, is called as `on_progress(articles_done, total)`
+    roughly once a second while workers are running -- this module has no
+    opinion on how that's displayed (no `rich`/UI dependency here), that's
+    up to the caller (see `cli.py`, which drives a progress bar off it).
     """
     zim_path = Path(zim_path)
     _validate_zim_path(zim_path)
@@ -111,13 +146,24 @@ def read_articles_metadata_parallel(
     ranges = [(i, min(i + step, total)) for i in range(0, total, step)]
 
     articles: list[ArticleMetadata] = []
-    with ProcessPoolExecutor(max_workers=workers) as pool:
-        futures = [
-            pool.submit(_extract_metadata_range, str(zim_path), start, end)
-            for start, end in ranges
-        ]
-        for future in futures:
-            articles.extend(future.result())
+    with multiprocessing.Manager() as manager:
+        counter = manager.Value("i", 0)
+        lock = manager.Lock()
+
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            pending = {
+                pool.submit(_extract_metadata_range, str(zim_path), start, end, counter, lock)
+                for start, end in ranges
+            }
+            while pending:
+                done, pending = wait(pending, timeout=1.0)
+                for future in done:
+                    articles.extend(future.result())
+                if on_progress is not None:
+                    on_progress(counter.value, total)
+
+    if on_progress is not None:
+        on_progress(total, total)
 
     return articles
 
@@ -137,6 +183,7 @@ def read_articles_metadata_cached(
     zim_path: str | Path,
     cache_path: str | Path,
     workers: int | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> list[ArticleMetadata]:
     """Like `read_articles_metadata_parallel`, but skips re-parsing the ZIM if a
     cache from a previous run of the *same* file is still valid.
@@ -159,7 +206,7 @@ def read_articles_metadata_cached(
         )
         return cached["articles"]
 
-    articles = read_articles_metadata_parallel(zim_path, workers=workers)
+    articles = read_articles_metadata_parallel(zim_path, workers=workers, on_progress=on_progress)
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     with cache_path.open("wb") as fh:
