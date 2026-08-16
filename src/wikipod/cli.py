@@ -14,7 +14,7 @@ from rich.console import Console
 from rich.table import Table
 
 from wikipod.analysis.metadata import extract_metadata
-from wikipod.analysis.reader import read_articles_metadata_parallel
+from wikipod.analysis.reader import read_articles_metadata_cached, read_articles_metadata_parallel
 from wikipod.analysis.statistics import link_frequency_map
 from wikipod.chunking.chunker import chunk_article
 from wikipod.config import get_config
@@ -39,13 +39,20 @@ def cli() -> None:
     "--recreate-index", is_flag=True, help="Drop and recreate the OpenSearch index first."
 )
 @click.option("--workers", default=None, type=int, help="Parallel workers for reading (default: all cores).")
-def index(recreate_index: bool, workers: int) -> None:
+@click.option(
+    "--no-cache", is_flag=True, help="Re-parse the ZIM even if a metadata cache exists."
+)
+def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
     """Select articles within budget, chunk, embed and index them into OpenSearch."""
     config = get_config()
     zim_path = config.resolve_path(config.paths.zim_file)
 
     console.print(f"[bold]Reading articles from[/bold] {zim_path}")
-    articles = read_articles_metadata_parallel(zim_path, workers)
+    if no_cache:
+        articles = read_articles_metadata_parallel(zim_path, workers)
+    else:
+        cache_path = config.resolve_path(config.paths.data_dir) / f"{zim_path.stem}_metadata_cache.pkl"
+        articles = read_articles_metadata_cached(zim_path, cache_path, workers)
     console.print(f"Read {len(articles)} articles")
 
     link_frequencies = link_frequency_map(articles)

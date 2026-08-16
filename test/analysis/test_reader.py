@@ -1,11 +1,14 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from wikipod.analysis.metadata import extract_metadata
+from wikipod.analysis.models import ArticleMetadata
 from wikipod.analysis.reader import (
     is_html_redirect,
     iter_articles,
+    read_articles_metadata_cached,
     read_articles_metadata_parallel,
 )
 
@@ -72,6 +75,74 @@ def _take(iterator, n):
         if i >= n:
             break
         yield item
+
+
+def _fake_article_metadata() -> list[ArticleMetadata]:
+    return [
+        ArticleMetadata(
+            article_id=1,
+            title="A",
+            html_size_bytes=10,
+            word_count=1,
+            link_count=0,
+            links=[],
+            section_count=0,
+            sections=[],
+            categories=[],
+        )
+    ]
+
+
+def test_read_articles_metadata_cached_parses_and_writes_cache_on_first_call(tmp_path):
+    zim_path = tmp_path / "fake.zim"
+    zim_path.write_bytes(b"fake")
+    cache_path = tmp_path / "cache.pkl"
+    fake_articles = _fake_article_metadata()
+
+    with patch(
+        "wikipod.analysis.reader.read_articles_metadata_parallel", return_value=fake_articles
+    ) as mock_parse:
+        result = read_articles_metadata_cached(zim_path, cache_path)
+
+    assert result == fake_articles
+    assert cache_path.exists()
+    mock_parse.assert_called_once()
+
+
+def test_read_articles_metadata_cached_reuses_cache_on_second_call(tmp_path):
+    zim_path = tmp_path / "fake.zim"
+    zim_path.write_bytes(b"fake")
+    cache_path = tmp_path / "cache.pkl"
+    fake_articles = _fake_article_metadata()
+
+    with patch(
+        "wikipod.analysis.reader.read_articles_metadata_parallel", return_value=fake_articles
+    ) as mock_parse:
+        read_articles_metadata_cached(zim_path, cache_path)
+        result = read_articles_metadata_cached(zim_path, cache_path)
+
+    assert result == fake_articles
+    mock_parse.assert_called_once()
+
+
+def test_read_articles_metadata_cached_reparses_when_zim_file_changes(tmp_path):
+    zim_path = tmp_path / "fake.zim"
+    zim_path.write_bytes(b"fake")
+    cache_path = tmp_path / "cache.pkl"
+
+    with patch(
+        "wikipod.analysis.reader.read_articles_metadata_parallel", return_value=[]
+    ) as mock_parse:
+        read_articles_metadata_cached(zim_path, cache_path)
+        zim_path.write_bytes(b"different content, different size")
+        read_articles_metadata_cached(zim_path, cache_path)
+
+    assert mock_parse.call_count == 2
+
+
+def test_read_articles_metadata_cached_detects_nonexistent_file_path(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        read_articles_metadata_cached("does_not_exist.zim", tmp_path / "cache.pkl")
 
 
 def test_read_articles_metadata_parallel_detects_nonexistent_file_path():
