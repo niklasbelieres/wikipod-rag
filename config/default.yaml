@@ -2,7 +2,7 @@
 # config/prod.yaml depending on WIKIPOD_ENV (defaults to "dev").
 
 paths:
-  zim_file: "test/data/climate-change-mini.zim"
+  zim_file: "src/wikipod/wikipedia_en_top.zim"
   pageviews_file: null # optional path to a Wikipedia pageviews dump (see selection/pageviews.py)
   data_dir: "data"
 

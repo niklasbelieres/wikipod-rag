@@ -1,0 +1,19 @@
+# Overrides for a medium-scale trial run on the Pi -- a real ZIM (a few GB,
+# not the tiny local dev mini-ZIM), but deliberately NOT the full en.wikipedia
+# dump from config/prod.yaml. Goal: measure RAM/time per article before
+# committing to a multi-hour run against the full ~100 GB dump.
+#
+# Usage: WIKIPOD_ENV=pi-test wikipod index --recreate-index
+
+paths:
+  zim_file: "/data/raw/wikipedia_en_top_nopic.zim" # adjust to the actual downloaded filename
+  data_dir: "/data"
+
+selection:
+  storage_budget_mb: 5000 # generous vs. a multi-GB medium dump; tune once you know the real ZIM size
+
+opensearch:
+  index_name: "wikipod-chunks-pitest"
+
+llm:
+  backend: "ollama"

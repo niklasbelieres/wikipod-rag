@@ -6,7 +6,7 @@ paths:
   pageviews_file: "/data/pageviews-aggregated.txt"
 
 selection:
-  storage_budget_mb: 200000 # ~200 GB,
+  storage_budget_mb: 200000 # ~200 GB
   weights:
     word_count: 0.15
     link_count: 0.15
