@@ -27,6 +27,7 @@ def build_client(config: OpenSearchConfig) -> OpenSearch:
         http_compress=True,
         use_ssl=config.use_ssl,
         verify_certs=config.verify_certs,
+        timeout=config.timeout,
     )
 
 

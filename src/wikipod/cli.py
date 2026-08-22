@@ -9,6 +9,9 @@ per `WIKIPOD_ENV`).
 
 from __future__ import annotations
 
+from datetime import datetime
+from pathlib import Path
+
 import click
 from rich.console import Console
 from rich.progress import Progress
@@ -24,7 +27,7 @@ from wikipod.indexing.opensearch_client import build_client, create_index, index
 from wikipod.rag.retriever import Retriever
 from wikipod.rag.prompt_builder import build_messages
 from wikipod.rag.generator import Generator
-from wikipod.selection.pageviews import load_pageviews
+from wikipod.selection.pageviews import download_pageviews_day, load_pageviews, save_pageviews
 from wikipod.selection.selector import select_within_budget
 
 console = Console()
@@ -33,6 +36,35 @@ console = Console()
 @click.group()
 def cli() -> None:
     """WikiPod: offline Wikipedia selection, indexing and retrieval."""
+
+
+@cli.command("fetch-pageviews")
+@click.option("--date", "date_str", required=True, help="Date to fetch, as YYYY-MM-DD.")
+@click.option(
+    "--out",
+    "out_path",
+    default=None,
+    help="Output path (default: config.paths.pageviews_file, or ./pageviews.txt).",
+)
+def fetch_pageviews(date_str: str, out_path: str | None) -> None:
+    """Download and aggregate a full day of Wikimedia pageviews for selection scoring."""
+    config = get_config()
+    day = datetime.strptime(date_str, "%Y-%m-%d").date()
+    target = Path(out_path) if out_path else config.resolve_path(
+        config.paths.pageviews_file or "pageviews.txt"
+    )
+
+    console.print(f"[bold]Fetching pageviews for {day}[/bold] (24 hourly dumps)")
+    with Progress(console=console) as progress:
+        task = progress.add_task("Downloading hours", total=24)
+
+        def on_progress(done: int, total: int) -> None:
+            progress.update(task, completed=done, total=total)
+
+        views = download_pageviews_day(day, on_progress=on_progress)
+
+    save_pageviews(views, target)
+    console.print(f"[green]Wrote {len(views)} article view-counts to {target}[/green]")
 
 
 @cli.command()
