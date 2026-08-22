@@ -3,9 +3,21 @@
 paths:
   zim_file: "/data/raw/wikipedia_en_all.zim"
   data_dir: "/data"
+  # Produce this with: wikipod fetch-pageviews --date <YYYY-MM-DD> --out /data/pageviews-aggregated.txt
+  pageviews_file: "/data/pageviews-aggregated.txt"
 
 selection:
   storage_budget_mb: 200000 # ~200 GB, leaves headroom on the 1 TB SSD
+  weights:
+    # Shifted vs. config/default.yaml: pageviews is a real external popularity
+    # signal now that it's wired up, incoming_links is only an in-corpus proxy
+    # for the same thing -- moved weight from the latter to the former rather
+    # than just adding pageviews on top (weights still sum to 1.0).
+    word_count: 0.15
+    link_count: 0.15
+    importance: 0.15
+    incoming_links: 0.25
+    pageviews: 0.3
 
 opensearch:
   host: "localhost"
