@@ -120,10 +120,14 @@ def _extract_metadata_range(
     return results
 
 
+METADATA_BATCH_SIZE = 5000
+
+
 def read_articles_metadata_parallel(
     zim_path: str | Path,
     workers: int | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    batch_size: int = METADATA_BATCH_SIZE,
 ) -> list[ArticleMetadata]:
     """Read every non-redirect article and extract its metadata, in parallel.
 
@@ -131,6 +135,14 @@ def read_articles_metadata_parallel(
     combined, just split across `workers` processes -- HTML parsing is
     CPU-bound pure Python, so `ProcessPoolExecutor` (real parallelism) is
     used instead of threads (which the GIL would block from helping here).
+
+    Work is split into many small `batch_size`-sized chunks (not just
+    `workers` equal-sized ones) so a `ProcessPoolExecutor` worker only ever
+    holds one batch's `ArticleMetadata` objects in memory at a time --
+    `ProcessPoolExecutor` automatically hands out the next batch as each
+    worker finishes one. With only `workers` large ranges instead, each
+    worker holds its *entire* multi-million-article share in memory at once,
+    which is what ran a Pi out of RAM+swap on the full en.wikipedia corpus.
 
     `on_progress`, if given, is called as `on_progress(articles_done, total)`
     roughly once a second while workers are running -- this module has no
@@ -142,8 +154,7 @@ def read_articles_metadata_parallel(
 
     workers = workers or os.cpu_count() or 1
     total = Archive(str(zim_path)).article_count
-    step = max((total + workers - 1) // workers, 1)
-    ranges = [(i, min(i + step, total)) for i in range(0, total, step)]
+    ranges = [(i, min(i + batch_size, total)) for i in range(0, total, batch_size)]
 
     articles: list[ArticleMetadata] = []
     with multiprocessing.Manager() as manager:
