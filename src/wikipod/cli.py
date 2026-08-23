@@ -17,8 +17,11 @@ from rich.console import Console
 from rich.progress import Progress
 from rich.table import Table
 
-from wikipod.analysis.metadata import extract_metadata
-from wikipod.analysis.reader import read_articles_metadata_cached, read_articles_metadata_parallel
+from wikipod.analysis.reader import (
+    read_articles_metadata_cached,
+    read_articles_metadata_for_ids,
+    read_articles_metadata_parallel,
+)
 from wikipod.analysis.statistics import link_frequency_map
 from wikipod.chunking.chunker import chunk_article
 from wikipod.config import get_config
@@ -88,13 +91,15 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
             progress.update(task, completed=done, total=total)
 
         if no_cache:
-            articles = read_articles_metadata_parallel(zim_path, workers, on_progress=on_progress)
+            articles = read_articles_metadata_parallel(
+                zim_path, workers, on_progress=on_progress, include_sections=False
+            )
         else:
             cache_path = (
                 config.resolve_path(config.paths.data_dir) / f"{zim_path.stem}_metadata_cache.pkl"
             )
             articles = read_articles_metadata_cached(
-                zim_path, cache_path, workers, on_progress=on_progress
+                zim_path, cache_path, workers, on_progress=on_progress, include_sections=False
             )
     console.print(f"Read {len(articles)} articles")
 
@@ -117,9 +122,13 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
         f"{result.utilization:.0%} utilization)"
     )
 
+    console.print("[bold]Fetching full text for the selected subset[/bold]")
+    selected_ids = [article.article_id for article in result.selected]
+    selected_with_text = read_articles_metadata_for_ids(zim_path, selected_ids, workers)
+
     chunks = [
         chunk
-        for article in result.selected
+        for article in selected_with_text
         for chunk in chunk_article(
             article, max_words=config.chunking.max_words, overlap=config.chunking.overlap
         )

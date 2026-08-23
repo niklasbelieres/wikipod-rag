@@ -9,7 +9,16 @@ from wikipod.analysis.html_utils import (
 from wikipod.analysis.models import Article, ArticleMetadata, Section
 
 
-def extract_metadata(article: Article) -> ArticleMetadata:
+def extract_metadata(article: Article, include_sections: bool = True) -> ArticleMetadata:
+    """Derive `ArticleMetadata` from `article`.
+
+    `include_sections=False` computes `word_count`/`section_count` exactly as
+    usual but discards the actual section text afterwards (`sections=[]`) --
+    for a full-corpus pass over millions of articles, keeping every article's
+    full body text in memory at once is what runs a 16 GB Pi out of RAM+swap.
+    Full text is only needed for the subset that survives selection (see
+    `reader.read_articles_metadata_for_ids`), not the whole corpus.
+    """
     root = get_content_root(article.html)
 
     links = extract_links(root)
@@ -24,7 +33,7 @@ def extract_metadata(article: Article) -> ArticleMetadata:
         link_count=len(links),
         links=links,
         section_count=len(sections),
-        sections=sections,
+        sections=sections if include_sections else [],
         categories=extract_categories(article.html),
     )
 
