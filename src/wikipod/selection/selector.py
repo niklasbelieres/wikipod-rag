@@ -9,6 +9,8 @@ provably optimal (true 0/1-knapsack is NP-hard) but is the standard, fast,
 and well-justified approximation for a corpus this size.
 """
 
+from collections.abc import Iterable
+
 from wikipod.analysis.models import ArticleMetadata
 from wikipod.config import SelectionWeights
 from wikipod.selection.models import SelectionResult
@@ -18,22 +20,32 @@ BYTES_PER_MB = 1024 * 1024
 
 
 def select_within_budget(
-    articles: list[ArticleMetadata],
+    articles: Iterable[ArticleMetadata],
     link_frequencies: dict[str, int],
     weights: SelectionWeights,
     storage_budget_mb: float,
     pageviews: dict[str, int] | None = None,
 ) -> SelectionResult:
-    """Greedily select articles by score-per-byte until `storage_budget_mb` is exhausted."""
+    """Greedily select articles by score-per-byte until `storage_budget_mb` is exhausted.
+
+    `articles` only needs to be iterated once, so this accepts any iterable,
+    not just a list -- notably a generator/streaming source (see
+    `analysis.reader.stream_articles_metadata_cached`), which matters at
+    full-corpus scale. Each candidate's `links`/`categories` are only needed
+    to *compute* its score; the kept copy has them stripped immediately
+    after, so this never holds `links` for the full corpus at once, only for
+    whichever single article is currently being scored.
+    """
     budget_bytes = storage_budget_mb * BYTES_PER_MB
 
-    scored = [
-        (
-            score_article(a, link_frequencies, weights, pageviews) / max(a.html_size_bytes, 1),
-            a,
+    scored: list[tuple[float, ArticleMetadata]] = []
+    total_candidates = 0
+    for article in articles:
+        total_candidates += 1
+        score = score_article(article, link_frequencies, weights, pageviews) / max(
+            article.html_size_bytes, 1
         )
-        for a in articles
-    ]
+        scored.append((score, article.model_copy(update={"links": [], "categories": []})))
     scored.sort(key=lambda pair: pair[0], reverse=True)
 
     selected: list[ArticleMetadata] = []
@@ -49,7 +61,7 @@ def select_within_budget(
         selected=selected,
         budget_mb=storage_budget_mb,
         used_mb=used_bytes / BYTES_PER_MB,
-        total_candidates=len(articles),
+        total_candidates=total_candidates,
     )
 
 

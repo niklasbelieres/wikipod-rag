@@ -3,6 +3,7 @@ Aggregate statistics over a collection of ArticleMetadata, used both for
 exploratory analysis and for sanity-checking the selection step.
 """
 from collections import Counter
+from collections.abc import Iterable
 
 from wikipod.analysis.models import ArticleMetadata
 
@@ -28,8 +29,13 @@ def summarize_articles(articles: list[ArticleMetadata]) -> dict[str, float | int
     }
 
 
-def link_frequency_map(articles: list[ArticleMetadata]) -> dict[str, int]:
+def link_frequency_map(articles: Iterable[ArticleMetadata]) -> dict[str, int]:
     """Count how often each link target is referenced across the corpus.
+
+    Accepts any iterable, not just a list -- notably a generator/streaming
+    source (see `analysis.reader.stream_articles_metadata_cached`), so a
+    full-corpus pass never needs every article's full metadata held in
+    memory at once, just this function's own running counter.
     """
     counter: Counter[str] = Counter()
     for article in articles:

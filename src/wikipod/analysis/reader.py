@@ -2,10 +2,12 @@
 Reads articles out of a KIWIX .zim archive.
 """
 
+import json
 import logging
 import multiprocessing
 import os
 import pickle
+import sys
 from collections.abc import Callable, Iterator
 from concurrent.futures import ProcessPoolExecutor, wait
 from pathlib import Path
@@ -149,14 +151,15 @@ def _extract_metadata_for_ids(
 METADATA_BATCH_SIZE = 5000
 
 
-def read_articles_metadata_parallel(
+def iter_articles_metadata_parallel(
     zim_path: str | Path,
     workers: int | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int = METADATA_BATCH_SIZE,
     include_sections: bool = True,
-) -> list[ArticleMetadata]:
-    """Read every non-redirect article and extract its metadata, in parallel.
+) -> Iterator[ArticleMetadata]:
+    """Read every non-redirect article and extract its metadata, in parallel,
+    yielding each one as it arrives rather than accumulating a list.
 
     Same skip-and-log behavior as `iter_articles` + `extract_metadata`
     combined, just split across `workers` processes -- HTML parsing is
@@ -170,12 +173,18 @@ def read_articles_metadata_parallel(
     worker finishes one. With only `workers` large ranges instead, each
     worker holds its *entire* multi-million-article share in memory at once.
 
-    `include_sections=False` is the important one for a full-corpus pass over
-    millions of articles: it drops each article's full body text (see
-    `analysis.metadata.extract_metadata`), which is what actually exhausts
-    RAM+swap on a 16 GB Pi once merged into one `articles` list -- word/link
-    counts survive, only the text does not. Re-fetch full text for just the
-    selected subset afterwards with `read_articles_metadata_for_ids`.
+    Yielding here (instead of returning a list, as `read_articles_metadata_parallel`
+    below does) is what lets a caller -- see `stream_articles_metadata_cached`
+    and `selection.selector.select_within_budget` -- process a multi-million
+    article corpus while only ever holding one article at a time in the main
+    process, rather than the whole corpus at once.
+
+    `include_sections=False` is the important one for a full-corpus pass:
+    it drops each article's full body text (see
+    `analysis.metadata.extract_metadata`), which combined with streaming
+    (rather than accumulating) is what keeps a full en.wikipedia pass within
+    16 GB. Re-fetch full text for just the selected subset afterwards with
+    `read_articles_metadata_for_ids`.
 
     `on_progress`, if given, is called as `on_progress(articles_done, total)`
     roughly once a second while workers are running -- this module has no
@@ -189,7 +198,6 @@ def read_articles_metadata_parallel(
     total = Archive(str(zim_path)).article_count
     ranges = [(i, min(i + batch_size, total)) for i in range(0, total, batch_size)]
 
-    articles: list[ArticleMetadata] = []
     with multiprocessing.Manager() as manager:
         counter = manager.Value("i", 0)
         lock = manager.Lock()
@@ -210,14 +218,53 @@ def read_articles_metadata_parallel(
             while pending:
                 done, pending = wait(pending, timeout=1.0)
                 for future in done:
-                    articles.extend(future.result())
+                    for article in future.result():
+                        _reintern_in_main_process(article)
+                        yield article
                 if on_progress is not None:
                     on_progress(counter.value, total)
 
     if on_progress is not None:
         on_progress(total, total)
 
-    return articles
+
+def read_articles_metadata_parallel(
+    zim_path: str | Path,
+    workers: int | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
+    batch_size: int = METADATA_BATCH_SIZE,
+    include_sections: bool = True,
+) -> list[ArticleMetadata]:
+    """`iter_articles_metadata_parallel`, materialized as a list.
+
+    Fine for small/medium ZIMs (dev, pi-test) where holding everything in
+    memory isn't a problem. For a full en.wikipedia-scale corpus, use
+    `iter_articles_metadata_parallel` or `stream_articles_metadata_cached`
+    directly instead, so the whole corpus is never held in memory at once.
+    """
+    return list(
+        iter_articles_metadata_parallel(
+            zim_path,
+            workers=workers,
+            on_progress=on_progress,
+            batch_size=batch_size,
+            include_sections=include_sections,
+        )
+    )
+
+
+def _reintern_in_main_process(article: ArticleMetadata) -> None:
+    """Re-intern `links`/`categories` after crossing a process boundary.
+
+    `sys.intern()` inside a worker (see `analysis.html_utils`) only
+    deduplicates strings within *that* worker's own interpreter -- results
+    shipped back via `ProcessPoolExecutor`'s pickling get deserialized as
+    fresh string objects in the main process, undoing the worker-local
+    sharing. Re-interning here restores full-corpus-wide deduplication
+    across *all* workers' contributions, not just within each one.
+    """
+    article.links = [sys.intern(link) for link in article.links]
+    article.categories = [sys.intern(category) for category in article.categories]
 
 
 def read_articles_metadata_for_ids(
@@ -313,3 +360,82 @@ def read_articles_metadata_cached(
         )
 
     return articles
+
+
+def _jsonl_cache_meta_path(cache_path: Path) -> Path:
+    return cache_path.with_name(cache_path.name + ".meta.json")
+
+
+def _jsonl_cache_is_valid(cache_path: Path, zim_stat: os.stat_result, include_sections: bool) -> bool:
+    meta_path = _jsonl_cache_meta_path(cache_path)
+    if not cache_path.exists() or not meta_path.exists():
+        return False
+    try:
+        meta = json.loads(meta_path.read_text())
+    except Exception:
+        return False
+    return (
+        meta.get("zim_size") == zim_stat.st_size
+        and meta.get("zim_mtime") == zim_stat.st_mtime
+        and meta.get("include_sections") == include_sections
+    )
+
+
+def _iter_jsonl_articles(cache_path: Path) -> Iterator[ArticleMetadata]:
+    with cache_path.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if line:
+                yield ArticleMetadata.model_validate_json(line)
+
+
+def stream_articles_metadata_cached(
+    zim_path: str | Path,
+    cache_path: str | Path,
+    workers: int | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
+    include_sections: bool = True,
+    batch_size: int = METADATA_BATCH_SIZE,
+) -> Iterator[ArticleMetadata]:
+    """JSONL-backed streaming cache: yields one `ArticleMetadata` at a time,
+    never holding the full corpus in memory -- the full-corpus counterpart to
+    `read_articles_metadata_cached` (which materializes a list, fine for
+    smaller ZIMs but not for the full en.wikipedia corpus).
+
+    On a cache hit (same ZIM size/mtime and `include_sections` as recorded in
+    the `<cache_path>.meta.json` sidecar), streams straight from `cache_path`
+    -- cheap, no HTML re-parsing. On a miss, runs the parallel extraction and
+    writes each article to `cache_path` as it's yielded (write-through), so
+    building `link_frequency_map` and then scoring -- both need a full pass,
+    see `selection.selector.select_within_budget` -- means calling this
+    twice, and the second call is always a cheap disk read regardless of
+    whether the first call populated the cache or found it already valid.
+    """
+    zim_path = Path(zim_path)
+    cache_path = Path(cache_path)
+    _validate_zim_path(zim_path)
+
+    stat = zim_path.stat()
+    if _jsonl_cache_is_valid(cache_path, stat, include_sections):
+        logger.info("Streaming cached article metadata from %s", cache_path)
+        yield from _iter_jsonl_articles(cache_path)
+        return
+
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    with cache_path.open("w", encoding="utf-8") as fh:
+        for article in iter_articles_metadata_parallel(
+            zim_path,
+            workers=workers,
+            on_progress=on_progress,
+            batch_size=batch_size,
+            include_sections=include_sections,
+        ):
+            fh.write(article.model_dump_json())
+            fh.write("\n")
+            yield article
+
+    _jsonl_cache_meta_path(cache_path).write_text(
+        json.dumps(
+            {"zim_size": stat.st_size, "zim_mtime": stat.st_mtime, "include_sections": include_sections}
+        )
+    )

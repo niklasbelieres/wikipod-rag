@@ -2,6 +2,8 @@
 Shared HTML-cleaning and extraction helpers.
 """
 import re
+import sys
+
 from bs4 import BeautifulSoup, Tag
 
 CONTENT_SELECTOR = ("div", {"class": "mw-parser-output"})
@@ -72,12 +74,26 @@ def extract_categories(html: str) -> list[str]:
             continue
         name = normalize_whitespace(anchor.get_text(" ", strip=True))
         if name:
-            categories.append(name)
+            # Interned: the same category name recurs across huge numbers of
+            # articles, so sharing one string object instead of a fresh copy
+            # per occurrence matters a lot at full-corpus scale (see extract_links).
+            categories.append(sys.intern(name))
     return categories
 
 
 def extract_links(root: Tag | None) -> list[str]:
-    """Return internal (intra-wiki) link targets, skipping external and self links."""
+    """Return internal (intra-wiki) link targets, skipping external and self links.
+
+    Link targets are interned (`sys.intern`): a small set of popular pages
+    (country names, common concepts, dates, ...) gets linked to from a huge
+    fraction of all articles, so most of the millions of link strings across
+    the full corpus are exact duplicates of each other. Interning makes
+    duplicates share one string object in memory instead of each holding its
+    own copy -- on the full en.wikipedia corpus this is the difference
+    between the corpus's link data fitting in RAM and not, independent of
+    (and in addition to) not keeping full article body text around
+    (`analysis.metadata.extract_metadata`'s `include_sections=False`).
+    """
     if root is None:
         return []
     links = []
@@ -85,7 +101,7 @@ def extract_links(root: Tag | None) -> list[str]:
         href = anchor["href"]
         if href.startswith("http") or href.startswith("./"):
             continue
-        links.append(href)
+        links.append(sys.intern(str(href)))
     return links
 
 

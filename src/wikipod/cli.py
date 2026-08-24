@@ -18,9 +18,8 @@ from rich.progress import Progress
 from rich.table import Table
 
 from wikipod.analysis.reader import (
-    read_articles_metadata_cached,
     read_articles_metadata_for_ids,
-    read_articles_metadata_parallel,
+    stream_articles_metadata_cached,
 )
 from wikipod.analysis.statistics import link_frequency_map
 from wikipod.chunking.chunker import chunk_article
@@ -76,46 +75,59 @@ def fetch_pageviews(date_str: str, out_path: str | None) -> None:
 )
 @click.option("--workers", default=None, type=int, help="Parallel workers for reading (default: all cores).")
 @click.option(
-    "--no-cache", is_flag=True, help="Re-parse the ZIM even if a metadata cache exists."
+    "--no-cache",
+    is_flag=True,
+    help="Discard any existing metadata cache first and force a fresh full parse.",
 )
 def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
-    """Select articles within budget, chunk, embed and index them into OpenSearch."""
+    """Select articles within budget, chunk, embed and index them into OpenSearch.
+
+    Two passes over the corpus are needed either way (building the global
+    link-frequency map has to finish before any article's importance score
+    can be computed), so both passes stream through the same on-disk JSONL
+    cache (see `stream_articles_metadata_cached`) instead of materializing
+    the full corpus in memory -- the first call populates the cache while
+    yielding, the second is then a cheap disk read.
+    """
     config = get_config()
     zim_path = config.resolve_path(config.paths.zim_file)
+    cache_path = config.resolve_path(config.paths.data_dir) / f"{zim_path.stem}_metadata_cache.jsonl"
+
+    if no_cache:
+        cache_path.unlink(missing_ok=True)
+        cache_path.with_name(cache_path.name + ".meta.json").unlink(missing_ok=True)
 
     console.print(f"[bold]Reading articles from[/bold] {zim_path}")
+    console.print("[bold]Pass 1/2:[/bold] building link frequency map")
     with Progress(console=console) as progress:
-        task = progress.add_task("Reading articles", total=None)
+        task = progress.add_task("Scanning articles", total=None)
 
         def on_progress(done: int, total: int) -> None:
             progress.update(task, completed=done, total=total)
 
-        if no_cache:
-            articles = read_articles_metadata_parallel(
-                zim_path, workers, on_progress=on_progress, include_sections=False
-            )
-        else:
-            cache_path = (
-                config.resolve_path(config.paths.data_dir) / f"{zim_path.stem}_metadata_cache.pkl"
-            )
-            articles = read_articles_metadata_cached(
+        link_frequencies = link_frequency_map(
+            stream_articles_metadata_cached(
                 zim_path, cache_path, workers, on_progress=on_progress, include_sections=False
             )
-    console.print(f"Read {len(articles)} articles")
-
-    link_frequencies = link_frequency_map(articles)
+        )
+    console.print(f"{len(link_frequencies)} distinct link targets")
 
     pageviews: dict[str, int] = {}
     if config.paths.pageviews_file:
         pageviews = load_pageviews(config.resolve_path(config.paths.pageviews_file))
 
-    result = select_within_budget(
-        articles,
-        link_frequencies,
-        config.selection.weights,
-        config.selection.storage_budget_mb,
-        pageviews=pageviews,
-    )
+    console.print("[bold]Pass 2/2:[/bold] scoring and selecting within budget")
+    with Progress(console=console) as progress:
+        progress.add_task("Scoring articles", total=None)
+        result = select_within_budget(
+            stream_articles_metadata_cached(
+                zim_path, cache_path, workers, include_sections=False
+            ),
+            link_frequencies,
+            config.selection.weights,
+            config.selection.storage_budget_mb,
+            pageviews=pageviews,
+        )
     console.print(
         f"Selected {len(result.selected)}/{result.total_candidates} articles "
         f"({result.used_mb:.1f}/{result.budget_mb:.0f} MB, "
