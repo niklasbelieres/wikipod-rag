@@ -25,6 +25,7 @@ from wikipod.analysis.statistics import link_frequency_map
 from wikipod.chunking.chunker import chunk_article
 from wikipod.config import get_config
 from wikipod.embeddings.embedder import Embedder
+from wikipod.evaluation.run_eval import main as evaluate_command
 from wikipod.indexing.opensearch_client import build_client, create_index, index_chunks
 from wikipod.rag.retriever import Retriever
 from wikipod.rag.prompt_builder import build_messages
@@ -105,10 +106,19 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
         def on_progress(done: int, total: int) -> None:
             progress.update(task, completed=done, total=total)
 
+        def on_freq_progress(articles_done: int, unique_links: int) -> None:
+            # Diagnostic, not just UI: does unique_links grow roughly linearly
+            # with articles_done (concerning) or flatten out (expected)?
+            console.print(
+                f"  [dim]... {articles_done} Artikel verarbeitet, "
+                f"{unique_links} eindeutige Linkziele[/dim]"
+            )
+
         link_frequencies = link_frequency_map(
             stream_articles_metadata_cached(
                 zim_path, cache_path, workers, on_progress=on_progress, include_sections=False
-            )
+            ),
+            on_progress=on_freq_progress,
         )
     console.print(f"{len(link_frequencies)} distinct link targets")
 
@@ -196,6 +206,9 @@ def query(text: str, top_k: int | None, chunks_only: bool) -> None:
     messages = build_messages(text, chunks)
     answer = Generator(config.llm).generate(messages)
     console.print(f"\n[bold]Answer:[/bold] {answer}")
+
+
+cli.add_command(evaluate_command, name="evaluate")
 
 
 if __name__ == "__main__":

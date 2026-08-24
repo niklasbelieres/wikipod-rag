@@ -3,7 +3,7 @@ Aggregate statistics over a collection of ArticleMetadata, used both for
 exploratory analysis and for sanity-checking the selection step.
 """
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from wikipod.analysis.models import ArticleMetadata
 
@@ -29,17 +29,30 @@ def summarize_articles(articles: list[ArticleMetadata]) -> dict[str, float | int
     }
 
 
-def link_frequency_map(articles: Iterable[ArticleMetadata]) -> dict[str, int]:
+def link_frequency_map(
+    articles: Iterable[ArticleMetadata],
+    on_progress: Callable[[int, int], None] | None = None,
+) -> dict[str, int]:
     """Count how often each link target is referenced across the corpus.
 
     Accepts any iterable, not just a list -- notably a generator/streaming
     source (see `analysis.reader.stream_articles_metadata_cached`), so a
     full-corpus pass never needs every article's full metadata held in
     memory at once, just this function's own running counter.
+
+    `on_progress`, if given, is called every 5000 articles as
+    `on_progress(articles_processed, unique_link_targets_so_far)` --
+    diagnostic hook to see whether the counter's *key count* keeps growing
+    roughly linearly with corpus size (concerning: the dict itself could be
+    the memory driver) or flattens out (the more expected shape, since
+    popular link targets get "discovered" early and later articles mostly
+    just bump existing counts rather than adding new keys).
     """
     counter: Counter[str] = Counter()
-    for article in articles:
+    for i, article in enumerate(articles, start=1):
         counter.update(article.links)
+        if on_progress is not None and i % 5000 == 0:
+            on_progress(i, len(counter))
     return dict(counter)
 
 
