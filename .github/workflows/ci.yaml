@@ -35,10 +35,6 @@ jobs:
 
     strategy:
       matrix:
-        # Capped at what's actually used in dev (default.yaml/prod.yaml
-        # deployments all run 3.12/3.13) -- newer versions risk failing on
-        # libzim (a C-extension dependency) not having a prebuilt wheel yet,
-        # which is an environment problem, not a code regression.
         python-version: ["3.11", "3.12", "3.13"]
 
     services:
