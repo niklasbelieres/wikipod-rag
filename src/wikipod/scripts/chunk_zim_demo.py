@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from wikipod.analysis.reader import iter_articles
 from wikipod.analysis.metadata import extract_metadata
+from wikipod.analysis.reader import iter_articles
 from wikipod.chunking.chunker import chunk_article
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]

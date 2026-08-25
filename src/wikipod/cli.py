@@ -27,9 +27,9 @@ from wikipod.config import get_config
 from wikipod.embeddings.embedder import Embedder
 from wikipod.evaluation.run_eval import main as evaluate_command
 from wikipod.indexing.opensearch_client import build_client, create_index, index_chunks
-from wikipod.rag.retriever import Retriever
-from wikipod.rag.prompt_builder import build_messages
 from wikipod.rag.generator import Generator
+from wikipod.rag.prompt_builder import build_messages
+from wikipod.rag.retriever import Retriever
 from wikipod.selection.pageviews import download_pageviews_day, load_pageviews, save_pageviews
 from wikipod.selection.selector import select_within_budget
 
@@ -102,8 +102,12 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
     """
     config = get_config()
     zim_path = config.resolve_path(config.paths.zim_file)
-    log_memory("start")     #Logs the baseline RAM usage before the indexing pipeline starts
-    cache_path = config.resolve_path(config.paths.data_dir) / f"{zim_path.stem}_metadata_cache.jsonl"
+
+    log_memory("start")
+    cache_path = (
+            config.resolve_path(config.paths.data_dir)
+            / f"{zim_path.stem}_metadata_cache.jsonl"
+    )
 
     if no_cache:
         cache_path.unlink(missing_ok=True)
@@ -131,7 +135,6 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
             ),
             on_progress=on_freq_progress,
         )
-        log_memory("after link freq")   #Logs RAM usage after building the link frequency map
     console.print(f"{len(link_frequencies)} distinct link targets")
 
     pageviews: dict[str, int] = {}
@@ -139,7 +142,6 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
         pageviews = load_pageviews(config.resolve_path(config.paths.pageviews_file))
 
     console.print("[bold]Pass 2/2:[/bold] scoring and selecting within budget")
-    log_memory("after pageviews")   #Logs RAM usage after loading the pageview data
     with Progress(console=console) as progress:
         progress.add_task("Scoring articles", total=None)
         result = select_within_budget(
@@ -151,7 +153,6 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
             config.selection.storage_budget_mb,
             pageviews=pageviews,
         )
-    log_memory("after selection")   #Logs RAM usage after scoring and selecting the articles
     console.print(
         f"Selected {len(result.selected)}/{result.total_candidates} articles "
         f"({result.used_mb:.1f}/{result.budget_mb:.0f} MB, "
@@ -161,7 +162,6 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
     console.print("[bold]Fetching full text for the selected subset[/bold]")
     selected_ids = [article.article_id for article in result.selected]
     selected_with_text = read_articles_metadata_for_ids(zim_path, selected_ids, workers)
-    log_memory("after fetching selected full text") #Logs RAM usage after loading the full text of the selected articles
 
     chunks = [
         chunk
@@ -170,7 +170,6 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
             article, max_words=config.chunking.max_words, overlap=config.chunking.overlap
         )
     ]
-    log_memory("after chunking")    #Logs RAM usage after creating all chunks
     console.print(f"Produced {len(chunks)} chunks")
 
     embedder = Embedder(config.embeddings.model_name, batch_size=config.embeddings.batch_size)
@@ -181,19 +180,11 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
     batch_size = config.embeddings.batch_size
     with Progress(console=console) as progress:
         task = progress.add_task("Embedding & indexing", total=len(chunks))
-        #enumerate adds a batch number so RAM usage can be logged every 100 indexing batches
-        for batch_no, start in enumerate(
-                range(0, len(chunks), batch_size),
-                start=1,
-        ):
+        for start in range(0, len(chunks), batch_size):
             batch = chunks[start : start + batch_size]
             vectors = embedder.embed_chunks(batch)
             indexed += index_chunks(client, config.opensearch.index_name, batch, vectors)
             progress.update(task, completed=min(start + batch_size, len(chunks)))
-
-            #Logs RAM usage every 100 batches during embedding and indexing
-            if batch_no % 100 == 0:
-                log_memory(f"after indexing batch {batch_no}")
 
     console.print(f"[green]Indexed {indexed} chunks into '{config.opensearch.index_name}'[/green]")
 

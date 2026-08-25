@@ -1,0 +1,8 @@
+- query: "who was Albert Einstein"
+  relevant_titles:
+    - "Albert Einstein"
+
+- query: "what causes climate change"
+  relevant_titles:
+    - "Causes of climate change"
+    - "Climate change"

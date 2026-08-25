@@ -1,6 +1,6 @@
 import pytest
 
-from wikipod.evaluation.metrics import mean_reciprocal_rank, reciprocal_rank, recall_at_k
+from wikipod.evaluation.metrics import mean_reciprocal_rank, recall_at_k, reciprocal_rank
 
 
 # -- recall_at_k --------------------------------------------------------------

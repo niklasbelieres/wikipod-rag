@@ -3,6 +3,7 @@ Core domain models shared across the pipeline.
 """
 from pydantic import BaseModel, Field
 
+
 class Article(BaseModel):
     """A single raw article as read from a ZIM archive."""
 
