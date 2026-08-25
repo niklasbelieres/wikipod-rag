@@ -1,6 +1,7 @@
-from wikipod.analysis.reader import iter_articles
-from wikipod.analysis.metadata import extract_metadata
 from pathlib import Path
+
+from wikipod.analysis.metadata import extract_metadata
+from wikipod.analysis.reader import iter_articles
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 

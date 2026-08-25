@@ -1,8 +1,10 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from wikipod.config import LLMConfig
 from wikipod.rag.generator import Generator
+
 
 def test_generate_ollama_returns_content_from_response():
     config = LLMConfig(backend="ollama", ollama_model="qwen2.5:1.5b")

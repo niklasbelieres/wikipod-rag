@@ -23,9 +23,10 @@ def mean_reciprocal_rank(all_retrieved: list[list], all_relevant: list[set]) -> 
     if not all_retrieved:
         return 0.0
     
+    # strict=True: raises ValueError if len(all_retrieved) != len(all_relevant)
     ranks = [
         reciprocal_rank(retrieved, relevant)
-        for retrieved, relevant in zip(all_retrieved, all_relevant, strict=True) # Throws ValueError if len(all_retrived) != len(all_relevant)
+        for retrieved, relevant in zip(all_retrieved, all_relevant, strict=True)
     ]
         
     return sum(ranks) / len(ranks)

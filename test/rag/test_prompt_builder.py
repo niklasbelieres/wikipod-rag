@@ -1,3 +1,4 @@
+from wikipod.chunking.chunker import Chunk
 from wikipod.rag.prompt_builder import (
     DEFAULT_MAX_CONTEXT_WORDS,
     SYSTEM_PROMPT,
@@ -5,7 +6,7 @@ from wikipod.rag.prompt_builder import (
     build_messages,
     format_context,
 )
-from wikipod.chunking.chunker import Chunk
+
 
 def test_one_chunk_leads_to_one_context_result():
     article_id = 1

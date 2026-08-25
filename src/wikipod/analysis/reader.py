@@ -63,7 +63,9 @@ def is_html_redirect(html: str) -> bool:
     return 'http-equiv="refresh"' in html and "URL=" in html
 
 
-def _extract_one(archive: Archive, article_id: int, include_sections: bool) -> ArticleMetadata | None:
+def _extract_one(
+    archive: Archive, article_id: int, include_sections: bool
+) -> ArticleMetadata | None:
     """Extract metadata for one article_id, or None if it's a redirect/not an article."""
     entry = archive._get_entry_by_id(article_id)
 
@@ -89,22 +91,7 @@ def _extract_metadata_range(
     report_every: int = 50,
     include_sections: bool = True,
 ) -> list[ArticleMetadata]:
-    """Worker target: extract metadata for article ids in [start, end).
-
-    Opens its own `Archive` handle rather than sharing one across processes --
-    libzim's `Archive` wraps a C-extension object and isn't picklable, so each
-    worker needs its own. ZIM files are read-only, so multiple independent
-    handles on the same file are safe.
-
-    `counter`/`lock` (proxies from a `multiprocessing.Manager`, *not* plain
-    `multiprocessing.Value`/`Lock` -- those can only be inherited via fork,
-    not passed through `ProcessPoolExecutor.submit()`, which breaks under the
-    `spawn` start method macOS/Windows default to) are optional; when given,
-    progress is reported in batches of `report_every` articles rather than
-    after every single one, since each update is an IPC round-trip to the
-    manager process -- doing that per-article would add real overhead across
-    a multi-million-article corpus.
-    """
+    """Worker target: extract metadata for article ids in [start, end)."""
     archive = Archive(zim_path)
     results: list[ArticleMetadata] = []
     pending_count = 0
@@ -162,34 +149,18 @@ def iter_articles_metadata_parallel(
     yielding each one as it arrives rather than accumulating a list.
 
     Same skip-and-log behavior as `iter_articles` + `extract_metadata`
-    combined, just split across `workers` processes -- HTML parsing is
-    CPU-bound pure Python, so `ProcessPoolExecutor` (real parallelism) is
-    used instead of threads (which the GIL would block from helping here).
+    combined, just split across `workers` processes.
 
     Work is split into many small `batch_size`-sized chunks (not just
     `workers` equal-sized ones) so a `ProcessPoolExecutor` worker only ever
-    holds one batch's `ArticleMetadata` objects in memory at a time --
+    holds one batch's `ArticleMetadata` objects in memory at a time.
     `ProcessPoolExecutor` automatically hands out the next batch as each
-    worker finishes one. With only `workers` large ranges instead, each
-    worker holds its *entire* multi-million-article share in memory at once.
+    worker finishes one.
 
-    Yielding here (instead of returning a list, as `read_articles_metadata_parallel`
-    below does) is what lets a caller -- see `stream_articles_metadata_cached`
-    and `selection.selector.select_within_budget` -- process a multi-million
-    article corpus while only ever holding one article at a time in the main
-    process, rather than the whole corpus at once.
-
-    `include_sections=False` is the important one for a full-corpus pass:
-    it drops each article's full body text (see
-    `analysis.metadata.extract_metadata`), which combined with streaming
-    (rather than accumulating) is what keeps a full en.wikipedia pass within
-    16 GB. Re-fetch full text for just the selected subset afterwards with
+    `include_sections=False` for a full-corpus pass:
+    it drops each article's full body text (see `analysis.metadata.extract_metadata`). 
+    Re-fetch full text for just the selected subset afterwards with
     `read_articles_metadata_for_ids`.
-
-    `on_progress`, if given, is called as `on_progress(articles_done, total)`
-    roughly once a second while workers are running -- this module has no
-    opinion on how that's displayed (no `rich`/UI dependency here), that's
-    up to the caller (see `cli.py`, which drives a progress bar off it).
     """
     zim_path = Path(zim_path)
     _validate_zim_path(zim_path)
@@ -237,10 +208,8 @@ def read_articles_metadata_parallel(
 ) -> list[ArticleMetadata]:
     """`iter_articles_metadata_parallel`, materialized as a list.
 
-    Fine for small/medium ZIMs (dev, pi-test) where holding everything in
-    memory isn't a problem. For a full en.wikipedia-scale corpus, use
-    `iter_articles_metadata_parallel` or `stream_articles_metadata_cached`
-    directly instead, so the whole corpus is never held in memory at once.
+    Works well for small and medium ZIM-files. For a full en-dump, the system
+    ran out of memory.
     """
     return list(
         iter_articles_metadata_parallel(
@@ -289,7 +258,9 @@ def read_articles_metadata_for_ids(
 
     articles: list[ArticleMetadata] = []
     with ProcessPoolExecutor(max_workers=workers) as pool:
-        futures = [pool.submit(_extract_metadata_for_ids, str(zim_path), batch) for batch in batches]
+        futures = [
+            pool.submit(_extract_metadata_for_ids, str(zim_path), batch) for batch in batches
+        ]
         for future in futures:
             articles.extend(future.result())
 
@@ -303,7 +274,9 @@ def _load_cache(cache_path: Path) -> dict | None:
         with cache_path.open("rb") as fh:
             return pickle.load(fh)
     except Exception:
-        logger.warning("Failed to load article cache at %s, will re-parse.", cache_path, exc_info=True)
+        logger.warning(
+            "Failed to load article cache at %s, will re-parse.", cache_path, exc_info=True
+        )
         return None
 
 
@@ -339,7 +312,9 @@ def read_articles_metadata_cached(
         and cached.get("include_sections") == include_sections
     ):
         logger.info(
-            "Using cached article metadata from %s (%d articles)", cache_path, len(cached["articles"])
+            "Using cached article metadata from %s (%d articles)",
+            cache_path,
+            len(cached["articles"]),
         )
         return cached["articles"]
 
@@ -366,7 +341,9 @@ def _jsonl_cache_meta_path(cache_path: Path) -> Path:
     return cache_path.with_name(cache_path.name + ".meta.json")
 
 
-def _jsonl_cache_is_valid(cache_path: Path, zim_stat: os.stat_result, include_sections: bool) -> bool:
+def _jsonl_cache_is_valid(
+    cache_path: Path, zim_stat: os.stat_result, include_sections: bool
+) -> bool:
     meta_path = _jsonl_cache_meta_path(cache_path)
     if not cache_path.exists() or not meta_path.exists():
         return False
@@ -436,6 +413,10 @@ def stream_articles_metadata_cached(
 
     _jsonl_cache_meta_path(cache_path).write_text(
         json.dumps(
-            {"zim_size": stat.st_size, "zim_mtime": stat.st_mtime, "include_sections": include_sections}
+            {
+                "zim_size": stat.st_size,
+                "zim_mtime": stat.st_mtime,
+                "include_sections": include_sections,
+            }
         )
     )

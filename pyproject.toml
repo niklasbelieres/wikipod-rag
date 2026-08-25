@@ -39,6 +39,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["test"]
 pythonpath = ["src"]
+filterwarnings = [
+    "ignore:builtin type .* has no __module__ attribute:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 100

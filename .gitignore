@@ -24,6 +24,9 @@ env/
 /indexing/
 /models/
 *.zim
+
+# Test zim should be in repo
+!/test/data/climate-change-mini.zim
 *.gguf
 
 # Evaluation outputs

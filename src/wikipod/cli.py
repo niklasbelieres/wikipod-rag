@@ -27,9 +27,9 @@ from wikipod.config import get_config
 from wikipod.embeddings.embedder import Embedder
 from wikipod.evaluation.run_eval import main as evaluate_command
 from wikipod.indexing.opensearch_client import build_client, create_index, index_chunks
-from wikipod.rag.retriever import Retriever
-from wikipod.rag.prompt_builder import build_messages
 from wikipod.rag.generator import Generator
+from wikipod.rag.prompt_builder import build_messages
+from wikipod.rag.retriever import Retriever
 from wikipod.selection.pageviews import download_pageviews_day, load_pageviews, save_pageviews
 from wikipod.selection.selector import select_within_budget
 
@@ -74,7 +74,9 @@ def fetch_pageviews(date_str: str, out_path: str | None) -> None:
 @click.option(
     "--recreate-index", is_flag=True, help="Drop and recreate the OpenSearch index first."
 )
-@click.option("--workers", default=None, type=int, help="Parallel workers for reading (default: all cores).")
+@click.option(
+    "--workers", default=None, type=int, help="Parallel workers for reading (default: all cores)."
+)
 @click.option(
     "--no-cache",
     is_flag=True,
@@ -92,7 +94,9 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
     """
     config = get_config()
     zim_path = config.resolve_path(config.paths.zim_file)
-    cache_path = config.resolve_path(config.paths.data_dir) / f"{zim_path.stem}_metadata_cache.jsonl"
+    cache_path = (
+        config.resolve_path(config.paths.data_dir) / f"{zim_path.stem}_metadata_cache.jsonl"
+    )
 
     if no_cache:
         cache_path.unlink(missing_ok=True)

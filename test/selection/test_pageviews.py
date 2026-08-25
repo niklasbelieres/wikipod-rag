@@ -11,7 +11,6 @@ from wikipod.selection.pageviews import (
     save_pageviews,
 )
 
-
 # -- normalize_title / get_views ----------------------------------------------
 
 
@@ -100,7 +99,9 @@ def test_download_pageviews_day_reports_progress_for_all_24_hours():
     calls = []
 
     with patch("wikipod.selection.pageviews.download_pageviews_hour", return_value={}):
-        download_pageviews_day(date(2026, 6, 1), on_progress=lambda done, total: calls.append((done, total)))
+        download_pageviews_day(
+            date(2026, 6, 1), on_progress=lambda done, total: calls.append((done, total))
+        )
 
     assert calls[-1] == (24, 24)
     assert len(calls) == 24

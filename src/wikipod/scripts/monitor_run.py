@@ -21,7 +21,7 @@ import csv
 import os
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -65,7 +65,7 @@ def sample() -> dict[str, object]:
     swap_free_mb = meminfo.get("SwapFree", 0) / 1024
 
     return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "load_1min": round(load1, 2),
         "load_5min": round(load5, 2),
         "cpu_pct_approx": round(load1 / cores * 100, 1),

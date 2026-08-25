@@ -7,7 +7,7 @@ from rich.table import Table
 
 from wikipod.config import get_config
 from wikipod.embeddings.embedder import Embedder
-from wikipod.evaluation.metrics import mean_reciprocal_rank, reciprocal_rank, recall_at_k
+from wikipod.evaluation.metrics import mean_reciprocal_rank, recall_at_k, reciprocal_rank
 from wikipod.indexing.opensearch_client import build_client
 from wikipod.rag.retriever import Retriever
 
@@ -22,10 +22,9 @@ def load_eval_dataset(path) -> list[dict]:
 
 
 def run_single_query(retriever: Retriever, query: str, k: int) -> list[str]:
-    """Query gegen den Retriever laufen lassen, article_titles der Top-k Chunks zurückgeben.
-    Achtung: mehrere Chunks können vom selben Artikel stammen -- Duplikate in der
-    Rückgabe sind hier okay, recall_at_k/reciprocal_rank verkraften das schon
-    (siehe die ignores_duplicate_matches-Tests von eben)."""
+    """Returns article titles of the top-k chunks. May contains duplicates, 
+    as one article might be split in multiple chunks.
+    """
     return [chunk.article_title for chunk in retriever.retrieve(query, k)]
     
 
@@ -47,13 +46,35 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
 
     # Pro Query einzeln aufrufen, nicht mit allen Queries auf einmal -- beide
     # Funktionen sind für genau eine Query definiert (siehe Signaturen in metrics.py).
+    # strict=True ueberall: alle vier Listen sind per Konstruktion (Listcomps
+    # ueber dasselbe `dataset`) gleich lang -- ein Laengen-Mismatch waere ein
+    # echter Bug, den strict=True sofort als ValueError sichtbar macht statt
+    # ihn still zu verschlucken.
     recall_at_k_values = [
         recall_at_k(retrieved, relevant, k)
-        for retrieved, relevant in zip(retrieved_titles, relevant_title_sets)
+        for retrieved, relevant in zip(retrieved_titles, relevant_title_sets, strict=True)
     ]
     reciprocal_rank_values = [
         reciprocal_rank(retrieved, relevant)
-        for retrieved, relevant in zip(retrieved_titles, relevant_title_sets)
+        for retrieved, relevant in zip(retrieved_titles, relevant_title_sets, strict=True)
+    ]
+
+    per_query = [
+        {
+            "query": query,
+            "relevant_titles": sorted(relevant),
+            "retrieved_titles": retrieved,
+            "recall_at_k": recall,
+            "reciprocal_rank": rank,
+        }
+        for query, relevant, retrieved, recall, rank in zip(
+            queries,
+            relevant_title_sets,
+            retrieved_titles,
+            recall_at_k_values,
+            reciprocal_rank_values,
+            strict=True,
+        )
     ]
 
     return {
@@ -62,18 +83,7 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
         # mean_reciprocal_rank ist bereits vorhanden und getestet -- wiederverwenden
         # statt die Mittelung hier nochmal von Hand nachzubauen.
         "mean_reciprocal_rank": mean_reciprocal_rank(retrieved_titles, relevant_title_sets),
-        "per_query": [
-            {
-                "query": query,
-                "relevant_titles": sorted(relevant),
-                "retrieved_titles": retrieved,
-                "recall_at_k": recall,
-                "reciprocal_rank": rank,
-            }
-            for query, relevant, retrieved, recall, rank in zip(
-                queries, relevant_title_sets, retrieved_titles, recall_at_k_values, reciprocal_rank_values
-            )
-        ],
+        "per_query": per_query,
     }
 
 
@@ -105,7 +115,9 @@ def main(dataset_path: Path, top_k: int | None) -> None:
     table.add_column("Recall@k")
     table.add_column("Reciprocal Rank")
     for entry in results["per_query"]:
-        table.add_row(entry["query"], f"{entry['recall_at_k']:.2f}", f"{entry['reciprocal_rank']:.2f}")
+        table.add_row(
+            entry["query"], f"{entry['recall_at_k']:.2f}", f"{entry['reciprocal_rank']:.2f}"
+        )
     console.print(table)
 
     console.print(

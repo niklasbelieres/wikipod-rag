@@ -70,7 +70,9 @@ PAGEVIEWS_BASE_URL = "https://dumps.wikimedia.org/other/pageviews"
 # Wikimedia rejects requests without a descriptive User-Agent (their anti-abuse
 # policy, see https://meta.wikimedia.org/wiki/User-Agent_policy) -- requests'
 # default UA gets a 403, not the 404 you'd expect for a missing dump.
-_REQUEST_HEADERS = {"User-Agent": "wikipod-rag/0.1 (student project, htw saar; RAG on Raspberry Pi)"}
+_REQUEST_HEADERS = {
+    "User-Agent": "wikipod-rag/0.1 (student project, htw saar; RAG on Raspberry Pi)"
+}
 
 
 def _parse_pageview_lines(lines: Iterable[str], domain_prefix: str) -> dict[str, int]:
@@ -129,7 +131,9 @@ def download_pageviews_hour(day: date, hour: int, domain_prefix: str = "en") -> 
         decompressed = gzip.decompress(response.content).decode("utf-8", errors="ignore")
         return _parse_pageview_lines(decompressed.splitlines(), domain_prefix)
     except Exception:
-        logger.warning("Failed to download/parse pageviews for %s hour %02d", day, hour, exc_info=True)
+        logger.warning(
+            "Failed to download/parse pageviews for %s hour %02d", day, hour, exc_info=True
+        )
         return {}
 
 
