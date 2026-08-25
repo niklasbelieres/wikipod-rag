@@ -9,10 +9,12 @@ per `WIKIPOD_ENV`).
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from pathlib import Path
 
 import click
+import psutil
 from rich.console import Console
 from rich.progress import Progress
 from rich.table import Table
@@ -32,10 +34,6 @@ from wikipod.rag.prompt_builder import build_messages
 from wikipod.rag.retriever import Retriever
 from wikipod.selection.pageviews import download_pageviews_day, load_pageviews, save_pageviews
 from wikipod.selection.selector import select_within_budget
-
-import os
-import psutil
-
 
 console = Console()
 
@@ -84,7 +82,12 @@ def fetch_pageviews(date_str: str, out_path: str | None) -> None:
 @click.option(
     "--recreate-index", is_flag=True, help="Drop and recreate the OpenSearch index first."
 )
-@click.option("--workers", default=None, type=int, help="Parallel workers for reading (default: all cores).")
+@click.option(
+    "--workers",
+    default=None,
+    type=int,
+    help="Parallel workers for reading (default: all cores).",
+)
 @click.option(
     "--no-cache",
     is_flag=True,
