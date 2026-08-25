@@ -9,9 +9,9 @@ import numpy as np
 
 from wikipod.analysis.metadata import extract_metadata
 from wikipod.analysis.reader import iter_articles
+from wikipod.analysis.statistics import link_frequency_map
 from wikipod.config import get_config
 from wikipod.selection.pageviews import get_views, load_pageviews
-from wikipod.analysis.statistics import link_frequency_map
 
 
 @dataclass
