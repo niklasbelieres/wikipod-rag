@@ -35,6 +35,44 @@ def _read_meminfo() -> dict[str, int]:
             info[key] = int(value)
     return info
 
+def _read_vmstat() -> dict[str, int]:
+    """Parse /proc/vmstat into a dictionary."""
+    stats: dict[str, int] = {}
+    with open("/proc/vmstat") as fh:
+        for line in fh:
+            key, value = line.split()
+            stats[key] = int(value)
+    return stats
+
+# Sums RSS for processes whose command line contains the given text.
+def _process_rss_mb(match: str) -> float:
+    total_kb = 0
+
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+
+        try:
+            cmdline = (
+                (entry / "cmdline")
+                .read_text(errors="ignore")
+                .replace("\x00", " ")
+            )
+
+            if match not in cmdline:
+                continue
+
+            status = (entry / "status").read_text()
+
+            for line in status.splitlines():
+                if line.startswith("VmRSS:"):
+                    total_kb += int(line.split()[1])
+                    break
+
+        except (FileNotFoundError, PermissionError, ProcessLookupError):
+            continue
+
+    return total_kb / 1024
 
 def _read_vcgencmd(*args: str) -> str | None:
     """Run a vcgencmd subcommand, return its stdout, or None off-Pi (command missing)."""
@@ -50,6 +88,11 @@ def _read_vcgencmd(*args: str) -> str | None:
 def sample() -> dict[str, object]:
     """Take one snapshot of system metrics."""
     meminfo = _read_meminfo()
+    #Reads the current swap activity counters for this sample
+    vmstat = _read_vmstat()
+    # Track WikiPod and OpenSearch memory separately from total system RAM.
+    wikipod_rss_mb = _process_rss_mb("wikipod")
+    opensearch_rss_mb = _process_rss_mb("org.opensearch.bootstrap.OpenSearch")
     load1, load5, _load15 = os.getloadavg()
     cores = os.cpu_count() or 1
 
@@ -70,9 +113,16 @@ def sample() -> dict[str, object]:
         "load_5min": round(load5, 2),
         "cpu_pct_approx": round(load1 / cores * 100, 1),
         "mem_used_mb": round(mem_total_mb - mem_available_mb, 1),
+        "mem_available_mb": round(mem_available_mb, 1),
         "mem_total_mb": round(mem_total_mb, 1),
+        "wikipod_rss_mb": round(wikipod_rss_mb, 1),
+        "opensearch_rss_mb": round(opensearch_rss_mb, 1),
         "swap_used_mb": round(swap_total_mb - swap_free_mb, 1),
         "swap_total_mb": round(swap_total_mb, 1),
+
+        # Tracks pages moved between RAM and swap to detect active swapping.
+        "swap_in_pages": vmstat.get("pswpin", 0),
+        "swap_out_pages": vmstat.get("pswpout", 0),
         "cpu_temp_c": temp_c,
         "throttled": throttled,
     }
