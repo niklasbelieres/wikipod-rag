@@ -1,8 +1,102 @@
-- query: "who was Albert Einstein"
-  relevant_titles:
-    - "Albert Einstein"
+# Personalities
 
-- query: "what causes climate change"
+- query: "Which music group did Michael Jackson perform with before becoming a successful solo artist?"
   relevant_titles:
-    - "Causes of climate change"
-    - "Climate change"
+    - "Michael Jackson"
+
+- query: "Which British king served as prince regent during his father's mental illness before becoming king himself?"
+  relevant_titles:
+    - "George IV"
+
+- query: "Which South African anti-apartheid activist spent 27 years in prison before becoming the country's first black president?"
+  relevant_titles:
+    - "Nelson Mandela"
+
+
+# History
+
+- query: "When and under which ruler did the Roman Empire become permanently divided into eastern and western parts?"
+  relevant_titles:
+    - "List of Roman emperors"
+
+- query: "How did the California Gold Rush contribute to California becoming a U.S. state?"
+  relevant_titles:
+    - "California gold rush"
+
+- query: "What political and legal arguments were used to justify the American colonies' separation from Great Britain in 1776?"
+  relevant_titles:
+    - "United States Declaration of Independence"
+
+
+# Politics / Society
+
+- query: "How did Reconstruction and the civil rights movement change the political and social status of Black Americans in the United States?"
+  relevant_titles:
+    - "African Americans"
+
+- query: "How did U.S. policies toward Native Americans shift from forced removal and assimilation toward tribal self-determination?"
+  relevant_titles:
+    - "Native Americans in the United States"
+
+
+# Biology / Medicine
+
+- query: "How can mutations in a gene lead to different observable traits in a population?"
+  relevant_titles:
+    - "Gene"
+
+- query: "Why can viruses not reproduce independently outside of a host cell?"
+  relevant_titles:
+    - "Virus"
+
+- query: "Which evolutionary processes cause heritable traits to become more or less common in a population over generations?"
+  relevant_titles:
+    - "Evolution"
+
+
+# Natural Science
+
+- query: "Why can a solar eclipse only occur near a new moon, and why does the Moon usually pass above or below the Sun instead of blocking it?"
+  relevant_titles:
+    - "Solar eclipse"
+
+- query: "What meteorological process occurs when condensed atmospheric water becomes too heavy to remain suspended in clouds and falls as rain, snow, hail, or other forms?"
+  relevant_titles:
+    - "Precipitation"
+
+
+# Geography
+
+- query: "What continent surrounds the South Pole, is mostly covered by a thick ice sheet, and is the coldest and driest continent on Earth?"
+  relevant_titles:
+    - "Antarctica"
+
+- query: "Which U.S. state has the most national parks, and how many national parks does it have?"
+  relevant_titles:
+    - "List of national parks of the United States"
+
+- query: "Which city is the capital of the United Kingdom, stands on the River Thames, and was originally founded by the Romans as Londinium?"
+  relevant_titles:
+    - "London"
+
+
+# Technology
+
+- query: "How did the original World Trade Center towers reduce the number of elevator shafts while still serving 110 floors?"
+  relevant_titles:
+    - "World Trade Center (1973–2001)"
+
+- query: "What type of electronic game uses an input device such as a controller, keyboard, or joystick to produce visual feedback on a screen?"
+  relevant_titles:
+    - "Video game"
+
+
+# Culture 
+
+- query: "Which Christian church is headed by the pope, governed centrally through the Holy See, and consists of the Latin Church and 23 Eastern Catholic Churches?"
+  relevant_titles:
+    - "Catholic Church"
+
+- query: "Which Mesoamerican civilization developed a sophisticated hieroglyphic writing system, complex calendars, monumental temples, and an early use of the number zero?"
+  relevant_titles:
+    - "Maya civilization"
