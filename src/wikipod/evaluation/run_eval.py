@@ -22,10 +22,14 @@ def load_eval_dataset(path) -> list[dict]:
 
 
 def run_single_query(retriever: Retriever, query: str, k: int) -> list[str]:
-    """Returns article titles of the top-k chunks. May contains duplicates, 
-    as one article might be split in multiple chunks.
-    """
-    return [chunk.article_title for chunk in retriever.retrieve(query, k)]
+    """Returns the top-k unique article titles for a query."""
+    chunks = retriever.retrieve(query, k=k * 4)
+
+    unique_titles = list(
+        dict.fromkeys(chunk.article_title for chunk in chunks)
+    )
+
+    return unique_titles[:k]
     
 
 

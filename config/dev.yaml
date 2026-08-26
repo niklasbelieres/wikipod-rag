@@ -1,7 +1,7 @@
 # Overrides for local development. Only list keys that differ from default.yaml.
 
 selection:
-  storage_budget_mb: 50 # small budget for fast local iteration
+  storage_budget_mb: 500 #had to increase this from 50->500 because of evaluation testing
 
 opensearch:
   index_name: "wikipod-chunks-dev"
