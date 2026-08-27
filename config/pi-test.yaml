@@ -6,7 +6,7 @@
 # Usage: WIKIPOD_ENV=pi-test wikipod index --recreate-index
 
 paths:
-  zim_file: "/data/raw/wikipedia_en_top_nopic.zim" # adjust to the actual downloaded filename
+  zim_file: "test/data/wikipedia_en_100_2026-08.zim" # adjust filename as needed
   data_dir: "/data"
 
 selection:
