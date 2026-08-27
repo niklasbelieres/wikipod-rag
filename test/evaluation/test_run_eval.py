@@ -60,13 +60,21 @@ def test_run_single_query_returns_article_titles():
     assert result[0] == "Europe"
 
 
-def test_run_single_query_keeps_duplicate_titles():
+def test_run_single_query_removes_duplicate_titles():
     retriever = MagicMock()
-    retriever.retrieve.return_value = [_chunk("Europe"), _chunk("France"), _chunk("France")]
-    
-    result = run_single_query(retriever, "Whats the capital of France?", 3)
-    assert len(result) == 3
-    assert result[1] == result[2]
+    retriever.retrieve.return_value = [
+        _chunk("Europe"),
+        _chunk("France"),
+        _chunk("France"),
+    ]
+
+    result = run_single_query(
+        retriever,
+        "Whats the capital of France?",
+        3,
+    )
+
+    assert result == ["Europe", "France"]
 
 def test_run_single_query_handles_empty_retrieval_result():
     retriever = MagicMock()
@@ -76,13 +84,17 @@ def test_run_single_query_handles_empty_retrieval_result():
     assert len(result) == 0
 
 
-def test_run_single_query_passes_k_through_to_retriever():
+def test_run_single_query_requests_more_chunks_for_deduplication():
     retriever = MagicMock()
     query = "Whats the capital of France?"
     k = 3
-    
+
     run_single_query(retriever, query, k)
-    retriever.retrieve.assert_called_once_with(query, k)
+
+    retriever.retrieve.assert_called_once_with(
+        query,
+        k=k * 4,
+    )
 
 
 # -- run_eval ------------------------------------------------------------------
