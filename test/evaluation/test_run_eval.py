@@ -301,3 +301,70 @@ def test_main_writes_csv_output(tmp_path, monkeypatch):
     assert "query,relevant_titles,retrieved_titles" in content
     assert "France" in content
     assert "Europe; France" in content
+
+
+
+def test_main_writes_output_directory(tmp_path, monkeypatch):
+        runner = CliRunner()
+
+        dataset_path = tmp_path / "eval.yaml"
+        dataset_path.write_text(
+            """
+    - query: "q1"
+      relevant_titles:
+        - "France"
+    """
+        )
+
+        output_dir = tmp_path / "eval_results"
+
+        fake_results = {
+            "k": 5,
+            "mean_recall_at_k": 1.0,
+            "mean_precision_at_k": 0.2,
+            "mean_ndcg_at_k": 1.0,
+            "mean_reciprocal_rank": 1.0,
+            "per_query": [
+                {
+                    "query": "q1",
+                    "relevant_titles": ["France"],
+                    "retrieved_titles": ["Europe", "France"],
+                    "recall_at_k": 1.0,
+                    "precision_at_k": 0.2,
+                    "ndcg_at_k": 1.0,
+                    "reciprocal_rank": 1.0,
+                }
+            ],
+        }
+
+        monkeypatch.setattr(
+            "wikipod.evaluation.run_eval.run_eval",
+            lambda retriever, dataset, k: fake_results,
+        )
+        monkeypatch.setattr(
+            "wikipod.evaluation.run_eval.build_client",
+            lambda config: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "wikipod.evaluation.run_eval.Embedder",
+            MagicMock(),
+        )
+        monkeypatch.setattr(
+            "wikipod.evaluation.run_eval.Retriever",
+            MagicMock(),
+        )
+
+        result = runner.invoke(
+            main,
+            [
+                "--dataset",
+                str(dataset_path),
+                "--output-dir",
+                str(output_dir),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert output_dir.exists()
+        assert (output_dir / "results.json").exists()
+        assert (output_dir / "results.csv").exists()

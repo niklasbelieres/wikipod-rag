@@ -150,11 +150,20 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
     help="Optional path for writing per-query evaluation results as CSV.",
 )
 
+@click.option(
+    "--output-dir",
+    "output_dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Optional directory for writing results.json and results.csv.",
+)
+
 def main(
     dataset_path: Path,
     top_k: int | None,
     output_path: Path | None,
     csv_output_path: Path | None,
+    output_dir: Path | None,
 ) -> None:
     """Run retrieval evaluation against DATASET_PATH and print all metrics."""
     config = get_config()
@@ -168,6 +177,11 @@ def main(
     console.print(f"[bold]{len(dataset)} Queries geladen aus[/bold] {dataset_path}")
 
     results = run_eval(retriever, dataset, k)
+
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "results.json"
+        csv_output_path = output_dir / "results.csv"
 
     if output_path is not None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
