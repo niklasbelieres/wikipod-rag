@@ -1,6 +1,12 @@
 import pytest
 
-from wikipod.evaluation.metrics import mean_reciprocal_rank, recall_at_k, reciprocal_rank
+from wikipod.evaluation.metrics import (
+    mean_reciprocal_rank,
+    ndcg_at_k,
+    precision_at_k,
+    recall_at_k,
+    reciprocal_rank,
+)
 
 
 # -- recall_at_k --------------------------------------------------------------
@@ -64,7 +70,66 @@ def test_recall_at_k_handles_k_larger_than_retrieved_length():
 def test_recall_at_k_handles_k_zero():
     assert recall_at_k([1, 2, 3], {1, 2}, k=0) == 0.0
 
+# -- precision_at_k -----------------------------------------------------------
+def test_precision_at_k_all_relevant():
+    assert precision_at_k([1, 2, 3], {1, 2, 3}, k=3) == 1.0
 
+
+def test_precision_at_k_partial_match():
+    assert precision_at_k([1, 2, 3, 4], {1, 3}, k=4) == 0.5
+
+
+def test_precision_at_k_no_match():
+    assert precision_at_k([1, 2, 3], {9}, k=3) == 0.0
+
+
+def test_precision_at_k_handles_empty_retrieved_ids():
+    assert precision_at_k([], {1, 2}, k=3) == 0.0
+
+
+def test_precision_at_k_handles_k_zero():
+    assert precision_at_k([1, 2, 3], {1, 2}, k=0) == 0.0
+
+
+def test_precision_at_k_uses_requested_k_as_denominator():
+    assert precision_at_k([1, 2], {1, 2}, k=5) == 0.4
+
+# -- ndcg_at_k ----------------------------------------------------------------
+def test_ndcg_at_k_perfect_ranking():
+    retrieved = [1, 2, 3, 4]
+    relevant = {1, 2}
+
+    assert ndcg_at_k(retrieved, relevant, k=4) == pytest.approx(1.0)
+
+
+def test_ndcg_at_k_penalizes_relevant_items_ranked_later():
+    retrieved = [9, 8, 1, 2]
+    relevant = {1, 2}
+
+    assert 0.0 < ndcg_at_k(retrieved, relevant, k=4) < 1.0
+
+
+def test_ndcg_at_k_no_relevant_results():
+    assert ndcg_at_k([1, 2, 3], {9}, k=3) == 0.0
+
+
+def test_ndcg_at_k_handles_empty_relevant_ids():
+    assert ndcg_at_k([1, 2, 3], set(), k=3) == 0.0
+
+
+def test_ndcg_at_k_handles_empty_retrieved_ids():
+    assert ndcg_at_k([], {1, 2}, k=3) == 0.0
+
+
+def test_ndcg_at_k_handles_k_zero():
+    assert ndcg_at_k([1, 2, 3], {1, 2}, k=0) == 0.0
+
+
+def test_ndcg_at_k_only_considers_first_k_items():
+    retrieved = [9, 1]
+    relevant = {1}
+
+    assert ndcg_at_k(retrieved, relevant, k=1) == 0.0
 # -- reciprocal_rank ------------------------------------------------------------
 def test_reciprocal_rank_first_position():
     assert reciprocal_rank([7, 1, 2, 3, 4], {7}) == 1.0

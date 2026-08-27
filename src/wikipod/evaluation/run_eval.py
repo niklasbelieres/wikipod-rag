@@ -7,7 +7,13 @@ from rich.table import Table
 
 from wikipod.config import get_config
 from wikipod.embeddings.embedder import Embedder
-from wikipod.evaluation.metrics import mean_reciprocal_rank, recall_at_k, reciprocal_rank
+from wikipod.evaluation.metrics import (
+    mean_reciprocal_rank,
+    ndcg_at_k,
+    precision_at_k,
+    recall_at_k,
+    reciprocal_rank,
+)
 from wikipod.indexing.opensearch_client import build_client
 from wikipod.rag.retriever import Retriever
 
@@ -34,9 +40,9 @@ def run_single_query(retriever: Retriever, query: str, k: int) -> list[str]:
 
 
 def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
-    """Für jede Query: run_single_query aufrufen, recall_at_k + reciprocal_rank
-    einzeln berechnen, sammeln. Am Ende: mean_reciprocal_rank über alle Queries,
-    Durchschnitts-Recall@k. Rückgabe als dict mit Einzel- und Aggregatwerten.
+    """Run retrieval evaluation for all queries in the dataset.
+    Calculates Recall@k, Precision@k, nDCG@k, and reciprocal rank per query,
+    plus mean aggregate metrics across the full dataset.
     """
     if not dataset:
         return {"k": k, "mean_recall_at_k": 0.0, "mean_reciprocal_rank": 0.0, "per_query": []}
@@ -58,6 +64,24 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
         recall_at_k(retrieved, relevant, k)
         for retrieved, relevant in zip(retrieved_titles, relevant_title_sets, strict=True)
     ]
+    precision_at_k_values = [
+        precision_at_k(retrieved, relevant, k)
+        for retrieved, relevant in zip(
+            retrieved_titles,
+            relevant_title_sets,
+            strict=True,
+        )
+    ]
+
+    ndcg_at_k_values = [
+        ndcg_at_k(retrieved, relevant, k)
+        for retrieved, relevant in zip(
+            retrieved_titles,
+            relevant_title_sets,
+            strict=True,
+        )
+    ]
+
     reciprocal_rank_values = [
         reciprocal_rank(retrieved, relevant)
         for retrieved, relevant in zip(retrieved_titles, relevant_title_sets, strict=True)
@@ -69,13 +93,17 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
             "relevant_titles": sorted(relevant),
             "retrieved_titles": retrieved,
             "recall_at_k": recall,
+            "precision_at_k": precision,
+            "ndcg_at_k": ndcg,
             "reciprocal_rank": rank,
         }
-        for query, relevant, retrieved, recall, rank in zip(
+        for query, relevant, retrieved, recall, precision, ndcg, rank in zip(
             queries,
             relevant_title_sets,
             retrieved_titles,
             recall_at_k_values,
+            precision_at_k_values,
+            ndcg_at_k_values,
             reciprocal_rank_values,
             strict=True,
         )
@@ -84,9 +112,12 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
     return {
         "k": k,
         "mean_recall_at_k": sum(recall_at_k_values) / len(recall_at_k_values),
-        # mean_reciprocal_rank ist bereits vorhanden und getestet -- wiederverwenden
-        # statt die Mittelung hier nochmal von Hand nachzubauen.
-        "mean_reciprocal_rank": mean_reciprocal_rank(retrieved_titles, relevant_title_sets),
+        "mean_precision_at_k": sum(precision_at_k_values) / len(precision_at_k_values),
+        "mean_ndcg_at_k": sum(ndcg_at_k_values) / len(ndcg_at_k_values),
+        "mean_reciprocal_rank": mean_reciprocal_rank(
+            retrieved_titles,
+            relevant_title_sets,
+        ),
         "per_query": per_query,
     }
 
@@ -101,7 +132,7 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
 )
 @click.option("--top-k", "top_k", default=None, type=int, help="Override config.retrieval.top_k.")
 def main(dataset_path: Path, top_k: int | None) -> None:
-    """Run retrieval evaluation (Recall@k, MRR) against DATASET_PATH."""
+    """Run retrieval evaluation against DATASET_PATH and print all metrics."""
     config = get_config()
     k = top_k or config.retrieval.top_k
 
@@ -117,15 +148,23 @@ def main(dataset_path: Path, top_k: int | None) -> None:
     table = Table(title=f"Evaluation (k={results['k']})")
     table.add_column("Query")
     table.add_column("Recall@k")
+    table.add_column("Precision@k")
+    table.add_column("nDCG@k")
     table.add_column("Reciprocal Rank")
     for entry in results["per_query"]:
         table.add_row(
-            entry["query"], f"{entry['recall_at_k']:.2f}", f"{entry['reciprocal_rank']:.2f}"
+            entry["query"],
+            f"{entry['recall_at_k']:.2f}",
+            f"{entry['precision_at_k']:.2f}",
+            f"{entry['ndcg_at_k']:.2f}",
+            f"{entry['reciprocal_rank']:.2f}",
         )
     console.print(table)
 
     console.print(
         f"\n[bold green]Mean Recall@k:[/bold green] {results['mean_recall_at_k']:.3f}   "
+        f"[bold green]Mean Precision@k:[/bold green] {results['mean_precision_at_k']:.3f}   "
+        f"[bold green]Mean nDCG@k:[/bold green] {results['mean_ndcg_at_k']:.3f}   "
         f"[bold green]MRR:[/bold green] {results['mean_reciprocal_rank']:.3f}"
     )
 
