@@ -1,3 +1,5 @@
+import csv
+import json
 from pathlib import Path
 
 import click
@@ -131,7 +133,29 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
     help="Path to the eval dataset (YAML/JSON list of {query, relevant_titles}).",
 )
 @click.option("--top-k", "top_k", default=None, type=int, help="Override config.retrieval.top_k.")
-def main(dataset_path: Path, top_k: int | None) -> None:
+
+@click.option(
+    "--output",
+    "output_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Optional path for writing evaluation results as JSON.",
+)
+
+@click.option(
+    "--csv-output",
+    "csv_output_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Optional path for writing per-query evaluation results as CSV.",
+)
+
+def main(
+    dataset_path: Path,
+    top_k: int | None,
+    output_path: Path | None,
+    csv_output_path: Path | None,
+) -> None:
     """Run retrieval evaluation against DATASET_PATH and print all metrics."""
     config = get_config()
     k = top_k or config.retrieval.top_k
@@ -144,6 +168,40 @@ def main(dataset_path: Path, top_k: int | None) -> None:
     console.print(f"[bold]{len(dataset)} Queries geladen aus[/bold] {dataset_path}")
 
     results = run_eval(retriever, dataset, k)
+
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with output_path.open("w", encoding="utf-8") as fh:
+            json.dump(results, fh, indent=2, ensure_ascii=False)
+
+        console.print(f"[green]Evaluation results written to[/green] {output_path}")
+    if csv_output_path is not None:
+        csv_output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        fieldnames = [
+            "query",
+            "relevant_titles",
+            "retrieved_titles",
+            "recall_at_k",
+            "precision_at_k",
+            "ndcg_at_k",
+            "reciprocal_rank",
+        ]
+
+        with csv_output_path.open("w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fieldnames)
+            writer.writeheader()
+
+            for entry in results["per_query"]:
+                row = entry.copy()
+                row["relevant_titles"] = "; ".join(entry["relevant_titles"])
+                row["retrieved_titles"] = "; ".join(entry["retrieved_titles"])
+                writer.writerow(row)
+
+        console.print(
+            f"[green]Per-query evaluation results written to[/green] {csv_output_path}"
+        )
 
     table = Table(title=f"Evaluation (k={results['k']})")
     table.add_column("Query")

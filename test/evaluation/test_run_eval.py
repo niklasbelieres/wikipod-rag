@@ -1,7 +1,14 @@
 from unittest.mock import MagicMock
 
+from click.testing import CliRunner
+
 from wikipod.chunking.models import Chunk
-from wikipod.evaluation.run_eval import load_eval_dataset, run_eval, run_single_query
+from wikipod.evaluation.run_eval import (
+    load_eval_dataset,
+    main,
+    run_eval,
+    run_single_query,
+)
 
 
 def _chunk(article_title: str) -> Chunk:
@@ -165,3 +172,132 @@ def test_run_eval_per_query_entries_have_correct_values():
     assert per_query[2]["relevant_titles"] == ["Baz"]
     assert per_query[2]["retrieved_titles"] == ["X", "Y"]
     assert per_query[2]["reciprocal_rank"] == 0.0
+
+def test_main_writes_json_output(tmp_path, monkeypatch):
+    runner = CliRunner()
+
+    dataset_path = tmp_path / "eval.yaml"
+    dataset_path.write_text(
+        """
+- query: "q1"
+  relevant_titles:
+    - "France"
+"""
+    )
+
+    output_path = tmp_path / "results.json"
+
+    fake_results = {
+        "k": 5,
+        "mean_recall_at_k": 1.0,
+        "mean_precision_at_k": 0.2,
+        "mean_ndcg_at_k": 1.0,
+        "mean_reciprocal_rank": 1.0,
+        "per_query": [],
+    }
+
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.run_eval",
+        lambda retriever, dataset, k: fake_results,
+    )
+
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.build_client",
+        lambda config: MagicMock(),
+    )
+
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.Embedder",
+        MagicMock(),
+    )
+
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.Retriever",
+        MagicMock(),
+    )
+
+    result = runner.invoke(
+        main,
+        [
+            "--dataset",
+            str(dataset_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert output_path.exists()
+    assert '"mean_recall_at_k": 1.0' in output_path.read_text()
+
+def test_main_writes_csv_output(tmp_path, monkeypatch):
+    runner = CliRunner()
+
+    dataset_path = tmp_path / "eval.yaml"
+    dataset_path.write_text(
+        """
+- query: "q1"
+  relevant_titles:
+    - "France"
+"""
+    )
+
+    output_path = tmp_path / "results.csv"
+
+    fake_results = {
+        "k": 5,
+        "mean_recall_at_k": 1.0,
+        "mean_precision_at_k": 0.2,
+        "mean_ndcg_at_k": 1.0,
+        "mean_reciprocal_rank": 1.0,
+        "per_query": [
+            {
+                "query": "q1",
+                "relevant_titles": ["France"],
+                "retrieved_titles": ["Europe", "France"],
+                "recall_at_k": 1.0,
+                "precision_at_k": 0.2,
+                "ndcg_at_k": 1.0,
+                "reciprocal_rank": 1.0,
+            }
+        ],
+    }
+
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.run_eval",
+        lambda retriever, dataset, k: fake_results,
+    )
+
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.build_client",
+        lambda config: MagicMock(),
+    )
+
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.Embedder",
+        MagicMock(),
+    )
+
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.Retriever",
+        MagicMock(),
+    )
+
+    result = runner.invoke(
+        main,
+        [
+            "--dataset",
+            str(dataset_path),
+            "--csv-output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert output_path.exists()
+
+    content = output_path.read_text()
+
+    assert "query,relevant_titles,retrieved_titles" in content
+    assert "France" in content
+    assert "Europe; France" in content
