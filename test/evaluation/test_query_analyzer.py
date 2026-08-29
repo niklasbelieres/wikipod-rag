@@ -88,6 +88,22 @@ def test_query_analyzer_keeps_in_scope_query_in_scope():
     assert analysis.query_type == "normal"
 
 
+def test_query_analyzer_applies_default_typo_corrections():
+    analyzer = QueryAnalyzer()
+
+    analysis = analyzer.analyze("Who was Geogre III?")
+
+    assert analysis.normalized_query == "Who was George III?"
+    assert analysis.query_type == "typo"
+
+
+def test_query_analyzer_corrects_catholic_church_typo():
+    analyzer = QueryAnalyzer()
+
+    analysis = analyzer.analyze("Cathlic Chuch")
+
+    assert analysis.normalized_query == "Catholic Church"
+    assert analysis.query_type == "typo"
 
 
 

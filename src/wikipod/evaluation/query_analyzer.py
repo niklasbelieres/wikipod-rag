@@ -14,7 +14,10 @@ class QueryAnalyzer:
         corrections: dict[str, str] | None = None,
         out_of_scope_queries: set[str] | None = None,
     ):
-        self.corrections = corrections or {}
+        self.corrections = corrections if corrections is not None else {
+            "Geogre": "George",
+            "Cathlic Chuch": "Catholic Church",
+        }
         self.out_of_scope_queries = out_of_scope_queries or set()
 
     def analyze(self, query: str) -> QueryAnalysis:

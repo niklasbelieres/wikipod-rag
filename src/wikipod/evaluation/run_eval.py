@@ -16,6 +16,7 @@ from wikipod.evaluation.metrics import (
     recall_at_k,
     reciprocal_rank,
 )
+from wikipod.evaluation.query_analyzer import QueryAnalyzer
 from wikipod.indexing.opensearch_client import build_client
 from wikipod.rag.retriever import Retriever
 
@@ -224,12 +225,20 @@ def run_eval(
     help="Optional directory for writing results.json and results.csv.",
 )
 
+@click.option(
+    "--use-query-analyzer",
+    is_flag=True,
+    default=False,
+    help="Normalize queries with the query analyzer before retrieval.",
+)
+
 def main(
     dataset_path: Path,
     top_k: int | None,
     output_path: Path | None,
     csv_output_path: Path | None,
     output_dir: Path | None,
+    use_query_analyzer: bool,
 ) -> None:
     """Run retrieval evaluation against DATASET_PATH and print all metrics."""
     config = get_config()
@@ -242,7 +251,11 @@ def main(
     dataset = load_eval_dataset(dataset_path)
     console.print(f"[bold]{len(dataset)} Queries geladen aus[/bold] {dataset_path}")
 
-    results = run_eval(retriever, dataset, k)
+    if use_query_analyzer:
+        analyzer = QueryAnalyzer()
+        results = run_eval(retriever, dataset, k, analyzer=analyzer)
+    else:
+        results = run_eval(retriever, dataset, k)
 
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -261,6 +274,7 @@ def main(
 
         fieldnames = [
             "query",
+            "normalized_query",
             "category",
             "is_out_of_scope",
             "relevant_titles",

@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 from click.testing import CliRunner
 
 from wikipod.chunking.models import Chunk
+from wikipod.evaluation.query_analyzer import QueryAnalyzer
 from wikipod.evaluation.run_eval import (
     load_eval_dataset,
     main,
@@ -470,3 +471,69 @@ def test_run_eval_records_normalized_query():
 
     assert entry["query"] == "Who was Geogre III?"
     assert entry["normalized_query"] == "Who was George III?"
+
+def test_main_accepts_query_analyzer_flag():
+    runner = CliRunner()
+
+    result = runner.invoke(main, ["--help"])
+
+    assert result.exit_code == 0
+    assert "--use-query-analyzer" in result.output
+
+
+def test_main_uses_query_analyzer_when_flag_is_set(tmp_path, monkeypatch):
+    runner = CliRunner()
+
+    dataset_path = tmp_path / "eval.yaml"
+    dataset_path.write_text(
+        """
+- query: "Who was Geogre III?"
+  category: "typo"
+  relevant_titles:
+    - "George III"
+"""
+    )
+
+    run_eval_mock = MagicMock(
+        return_value={
+            "k": 5,
+            "mean_recall_at_k": 1.0,
+            "mean_precision_at_k": 0.2,
+            "mean_ndcg_at_k": 1.0,
+            "mean_reciprocal_rank": 1.0,
+            "per_query": [],
+        }
+    )
+
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.run_eval",
+        run_eval_mock,
+    )
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.build_client",
+        lambda config: MagicMock(),
+    )
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.Embedder",
+        MagicMock(),
+    )
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.Retriever",
+        MagicMock(),
+    )
+
+    result = runner.invoke(
+        main,
+        [
+            "--dataset",
+            str(dataset_path),
+            "--top-k",
+            "5",
+            "--use-query-analyzer",
+        ],
+    )
+
+    assert result.exit_code == 0
+
+    analyzer = run_eval_mock.call_args.kwargs["analyzer"]
+    assert isinstance(analyzer, QueryAnalyzer)

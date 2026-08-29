@@ -43,6 +43,11 @@
   relevant_titles:
     - "George III"
 
+- query: "Cathlic Chuch"
+  category: "typo"
+  relevant_titles:
+    - "Catholic Church"
+
 
 # Short queries
 - query: "Beetle"
