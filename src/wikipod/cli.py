@@ -28,6 +28,7 @@ from wikipod.chunking.chunker import chunk_article
 from wikipod.config import get_config
 from wikipod.embeddings.embedder import Embedder
 from wikipod.evaluation.run_eval import main as evaluate_command
+from wikipod.evaluation.run_slm_eval import main as evaluate_models_command
 from wikipod.indexing.opensearch_client import build_client, create_index, index_chunks
 from wikipod.rag.generator import Generator
 from wikipod.rag.prompt_builder import build_messages
@@ -227,6 +228,7 @@ def query(text: str, top_k: int | None, chunks_only: bool) -> None:
 
 
 cli.add_command(evaluate_command, name="evaluate")
+cli.add_command(evaluate_models_command, name="evaluate-models")
 
 
 if __name__ == "__main__":
