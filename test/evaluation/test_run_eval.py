@@ -137,6 +137,13 @@ def test_run_eval_handles_empty_dataset():
     result = run_eval(retriever, dataset, k=k)
     assert result["mean_reciprocal_rank"] == 0.0
     assert result["k"] == k
+    assert result["mean_recall_at_k"] == 0.0
+    assert result["mean_precision_at_k"] == 0.0
+    assert result["mean_ndcg_at_k"] == 0.0
+    assert result["mean_reciprocal_rank"] == 0.0
+    assert result["by_category"] == {}
+    assert result["per_query"] == []
+    assert result["k"] == k
     
 
 
@@ -149,7 +156,7 @@ def test_run_eval_per_query_entries_have_correct_values():
     ]
 
     dataset = [
-        {"query": "q1", "relevant_titles": ["France"]},
+        {"query": "q1", "category": "short", "relevant_titles": ["France"]},
         {"query": "q2", "relevant_titles": ["Foo"]},
         {"query": "q3", "relevant_titles": ["Baz"]},
     ]
@@ -159,6 +166,7 @@ def test_run_eval_per_query_entries_have_correct_values():
     assert len(per_query) == 3
 
     assert per_query[0]["query"] == "q1"
+    assert per_query[0]["category"] == "short"
     assert per_query[0]["relevant_titles"] == ["France"]
     assert per_query[0]["retrieved_titles"] == ["Europe", "France"]
     assert per_query[0]["reciprocal_rank"] == 0.5
@@ -172,6 +180,26 @@ def test_run_eval_per_query_entries_have_correct_values():
     assert per_query[2]["relevant_titles"] == ["Baz"]
     assert per_query[2]["retrieved_titles"] == ["X", "Y"]
     assert per_query[2]["reciprocal_rank"] == 0.0
+
+def test_run_eval_aggregates_metrics_by_category():
+    retriever = MagicMock()
+    retriever.retrieve.side_effect = [
+        [_chunk("France")],
+        [_chunk("Wrong")],
+    ]
+
+    dataset = [
+        {"query": "q1", "category": "short", "relevant_titles": ["France"]},
+        {"query": "q2", "category": "short", "relevant_titles": ["Germany"]},
+    ]
+
+    result = run_eval(retriever, dataset, k=5)
+
+    assert result["by_category"]["short"]["query_count"] == 2
+    assert result["by_category"]["short"]["mean_recall_at_k"] == 0.5
+    assert result["by_category"]["short"]["mean_precision_at_k"] == 0.1
+    assert result["by_category"]["short"]["mean_ndcg_at_k"] == 0.5
+    assert result["by_category"]["short"]["mean_reciprocal_rank"] == 0.5
 
 def test_main_writes_json_output(tmp_path, monkeypatch):
     runner = CliRunner()
@@ -298,7 +326,7 @@ def test_main_writes_csv_output(tmp_path, monkeypatch):
 
     content = output_path.read_text()
 
-    assert "query,relevant_titles,retrieved_titles" in content
+    assert "query,category,relevant_titles,retrieved_titles" in content
     assert "France" in content
     assert "Europe; France" in content
 

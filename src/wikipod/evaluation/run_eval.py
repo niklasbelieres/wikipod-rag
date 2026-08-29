@@ -47,9 +47,18 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
     plus mean aggregate metrics across the full dataset.
     """
     if not dataset:
-        return {"k": k, "mean_recall_at_k": 0.0, "mean_reciprocal_rank": 0.0, "per_query": []}
+        return {
+            "k": k,
+            "mean_recall_at_k": 0.0,
+            "mean_precision_at_k": 0.0,
+            "mean_ndcg_at_k": 0.0,
+            "mean_reciprocal_rank": 0.0,
+            "by_category": {},
+            "per_query": [],
+        }
 
     queries = [elem["query"] for elem in dataset]
+    categories = [elem.get("category", "uncategorized") for elem in dataset]
     # recall_at_k/reciprocal_rank erwarten relevant_ids als set (Mitgliedschaftstest),
     # nicht als list wie im Dataset -- muss hier explizit konvertiert werden.
     relevant_title_sets = [set(elem["relevant_titles"]) for elem in dataset]
@@ -92,6 +101,7 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
     per_query = [
         {
             "query": query,
+            "category": category,
             "relevant_titles": sorted(relevant),
             "retrieved_titles": retrieved,
             "recall_at_k": recall,
@@ -99,8 +109,9 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
             "ndcg_at_k": ndcg,
             "reciprocal_rank": rank,
         }
-        for query, relevant, retrieved, recall, precision, ndcg, rank in zip(
+        for query, category, relevant, retrieved, recall, precision, ndcg, rank in zip(
             queries,
+            categories,
             relevant_title_sets,
             retrieved_titles,
             recall_at_k_values,
@@ -110,6 +121,34 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
             strict=True,
         )
     ]
+    by_category = {}
+
+    for entry in per_query:
+        category = entry["category"]
+
+        if category not in by_category:
+            by_category[category] = []
+
+        by_category[category].append(entry)
+
+    by_category = {
+        category: {
+            "query_count": len(entries),
+            "mean_recall_at_k": sum(
+                entry["recall_at_k"] for entry in entries
+            ) / len(entries),
+            "mean_precision_at_k": sum(
+                entry["precision_at_k"] for entry in entries
+            ) / len(entries),
+            "mean_ndcg_at_k": sum(
+                entry["ndcg_at_k"] for entry in entries
+            ) / len(entries),
+            "mean_reciprocal_rank": sum(
+                entry["reciprocal_rank"] for entry in entries
+            ) / len(entries),
+        }
+        for category, entries in by_category.items()
+    }
 
     return {
         "k": k,
@@ -121,6 +160,7 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
             relevant_title_sets,
         ),
         "per_query": per_query,
+        "by_category": by_category,
     }
 
 
@@ -195,6 +235,7 @@ def main(
 
         fieldnames = [
             "query",
+            "category",
             "relevant_titles",
             "retrieved_titles",
             "recall_at_k",

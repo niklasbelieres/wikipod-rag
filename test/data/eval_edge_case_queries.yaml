@@ -1,0 +1,62 @@
+# Similar entities
+- query: "Tell me about beetles"
+  category: "similar_entity"
+  relevant_titles:
+    - "Beetle"
+
+- query: "Who were the Beatles?"
+  category: "similar_entity"
+  relevant_titles:
+    - "The Beatles"
+
+- query: "Who was George III?"
+  category: "similar_entity"
+  relevant_titles:
+    - "George III"
+
+- query: "Who was George IV?"
+  category: "similar_entity"
+  relevant_titles:
+    - "George IV"
+
+
+# Aliases and redirects
+- query: "Tell me about the District of Columbia"
+  category: "alias"
+  relevant_titles:
+    - "Washington, D.C."
+
+- query: "Tell me about the Roman Catholic Church"
+  category: "alias"
+  relevant_titles:
+    - "Catholic Church"
+
+
+# Typos
+- query: "Tell me about dinasaurs"
+  category: "typo"
+  relevant_titles:
+    - "Dinosaur"
+
+- query: "Who was Geogre III?"
+  category: "typo"
+  relevant_titles:
+    - "George III"
+
+
+# Short queries
+- query: "Beetle"
+  category: "short"
+  relevant_titles:
+    - "Beetle"
+
+- query: "George III"
+  category: "short"
+  relevant_titles:
+    - "George III"
+
+
+# Out-of-scope queries
+- query: "Tell me about Albert Einstein"
+  category: "out_of_scope"
+  relevant_titles: []
