@@ -41,7 +41,12 @@ def run_single_query(retriever: Retriever, query: str, k: int) -> list[str]:
     
 
 
-def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
+def run_eval(
+    retriever: Retriever,
+    dataset: list[dict],
+    k: int,
+    analyzer=None,
+) -> dict:
     """Run retrieval evaluation for all queries in the dataset.
     Calculates Recall@k, Precision@k, nDCG@k, and reciprocal rank per query,
     plus mean aggregate metrics across the full dataset.
@@ -63,7 +68,15 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
     # nicht als list wie im Dataset -- muss hier explizit konvertiert werden.
     relevant_title_sets = [set(elem["relevant_titles"]) for elem in dataset]
 
-    retrieved_titles = [run_single_query(retriever, query, k) for query in queries]
+    retrieval_queries = [
+        analyzer.analyze(query).normalized_query if analyzer else query
+        for query in queries
+    ]
+
+    retrieved_titles = [
+        run_single_query(retriever, query, k)
+        for query in retrieval_queries
+    ]
 
     # Pro Query einzeln aufrufen, nicht mit allen Queries auf einmal -- beide
     # Funktionen sind für genau eine Query definiert (siehe Signaturen in metrics.py).
@@ -101,7 +114,9 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
     per_query = [
         {
             "query": query,
+            "normalized_query": retrieval_query,
             "category": category,
+            "is_out_of_scope": category == "out_of_scope",
             "relevant_titles": sorted(relevant),
             "retrieved_titles": retrieved,
             "recall_at_k": recall,
@@ -109,8 +124,19 @@ def run_eval(retriever: Retriever, dataset: list[dict], k: int) -> dict:
             "ndcg_at_k": ndcg,
             "reciprocal_rank": rank,
         }
-        for query, category, relevant, retrieved, recall, precision, ndcg, rank in zip(
+        for (
+            query,
+            retrieval_query,
+            category,
+            relevant,
+            retrieved,
+            recall,
+            precision,
+            ndcg,
+            rank,
+        ) in zip(
             queries,
+            retrieval_queries,
             categories,
             relevant_title_sets,
             retrieved_titles,
@@ -236,6 +262,7 @@ def main(
         fieldnames = [
             "query",
             "category",
+            "is_out_of_scope",
             "relevant_titles",
             "retrieved_titles",
             "recall_at_k",

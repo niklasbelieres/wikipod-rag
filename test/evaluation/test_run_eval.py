@@ -281,6 +281,8 @@ def test_main_writes_csv_output(tmp_path, monkeypatch):
         "per_query": [
             {
                 "query": "q1",
+                "category": "normal",
+                "is_out_of_scope": False,
                 "relevant_titles": ["France"],
                 "retrieved_titles": ["Europe", "France"],
                 "recall_at_k": 1.0,
@@ -326,7 +328,10 @@ def test_main_writes_csv_output(tmp_path, monkeypatch):
 
     content = output_path.read_text()
 
-    assert "query,category,relevant_titles,retrieved_titles" in content
+    assert (
+            "query,category,is_out_of_scope,relevant_titles,retrieved_titles"
+            in content
+    )
     assert "France" in content
     assert "Europe; France" in content
 
@@ -338,10 +343,11 @@ def test_main_writes_output_directory(tmp_path, monkeypatch):
         dataset_path = tmp_path / "eval.yaml"
         dataset_path.write_text(
             """
-    - query: "q1"
-      relevant_titles:
-        - "France"
-    """
+        - query: "q1"
+          category: "normal"
+          relevant_titles:
+            - "France"
+        """
         )
 
         output_dir = tmp_path / "eval_results"
@@ -396,3 +402,71 @@ def test_main_writes_output_directory(tmp_path, monkeypatch):
         assert output_dir.exists()
         assert (output_dir / "results.json").exists()
         assert (output_dir / "results.csv").exists()
+
+def test_run_eval_marks_out_of_scope_query():
+    retriever = MagicMock()
+    retriever.retrieve.return_value = [
+        _chunk("Germany"),
+        _chunk("Nelson Mandela"),
+    ]
+
+    dataset = [
+        {
+            "query": "Tell me about Albert Einstein",
+            "category": "out_of_scope",
+            "relevant_titles": [],
+        }
+    ]
+
+    result = run_eval(retriever, dataset, k=5)
+
+    entry = result["per_query"][0]
+
+    assert entry["is_out_of_scope"] is True
+
+
+def test_run_eval_uses_normalized_query_from_analyzer():
+    retriever = MagicMock()
+    retriever.retrieve.return_value = [_chunk("George III")]
+
+    analyzer = MagicMock()
+    analyzer.analyze.return_value.normalized_query = "Who was George III?"
+
+    dataset = [
+        {
+            "query": "Who was Geogre III?",
+            "category": "typo",
+            "relevant_titles": ["George III"],
+        }
+    ]
+
+    run_eval(retriever, dataset, k=5, analyzer=analyzer)
+
+    analyzer.analyze.assert_called_once_with("Who was Geogre III?")
+    retriever.retrieve.assert_called_once_with(
+        "Who was George III?",
+        k=20,
+    )
+
+
+def test_run_eval_records_normalized_query():
+    retriever = MagicMock()
+    retriever.retrieve.return_value = [_chunk("George III")]
+
+    analyzer = MagicMock()
+    analyzer.analyze.return_value.normalized_query = "Who was George III?"
+
+    dataset = [
+        {
+            "query": "Who was Geogre III?",
+            "category": "typo",
+            "relevant_titles": ["George III"],
+        }
+    ]
+
+    result = run_eval(retriever, dataset, k=5, analyzer=analyzer)
+
+    entry = result["per_query"][0]
+
+    assert entry["query"] == "Who was Geogre III?"
+    assert entry["normalized_query"] == "Who was George III?"
