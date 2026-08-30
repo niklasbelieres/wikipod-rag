@@ -227,7 +227,7 @@ def test_main_writes_json_output(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "wikipod.evaluation.run_eval.run_eval",
-        lambda retriever, dataset, k: fake_results,
+        lambda retriever, dataset, k, judge=None: fake_results,
     )
 
     monkeypatch.setattr(
@@ -286,6 +286,13 @@ def test_main_writes_csv_output(tmp_path, monkeypatch):
                 "is_out_of_scope": False,
                 "relevant_titles": ["France"],
                 "retrieved_titles": ["Europe", "France"],
+                "llm_judge_results": [
+                    {
+                        "title": "France",
+                        "relevance_score": 3,
+                        "reasoning": "Directly relevant.",
+                    }
+                ],
                 "recall_at_k": 1.0,
                 "precision_at_k": 0.2,
                 "ndcg_at_k": 1.0,
@@ -296,7 +303,7 @@ def test_main_writes_csv_output(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "wikipod.evaluation.run_eval.run_eval",
-        lambda retriever, dataset, k: fake_results,
+        lambda retriever, dataset, k, judge=None: fake_results,
     )
 
     monkeypatch.setattr(
@@ -330,11 +337,15 @@ def test_main_writes_csv_output(tmp_path, monkeypatch):
     content = output_path.read_text()
 
     assert (
-            "query,category,is_out_of_scope,relevant_titles,retrieved_titles"
+            "query,normalized_query,category,is_out_of_scope,"
+            "relevant_titles,llm_judge_results,retrieved_titles"
             in content
     )
     assert "France" in content
     assert "Europe; France" in content
+
+    assert "llm_judge_results" in content
+    assert "Directly relevant." in content
 
 
 
@@ -374,7 +385,7 @@ def test_main_writes_output_directory(tmp_path, monkeypatch):
 
         monkeypatch.setattr(
             "wikipod.evaluation.run_eval.run_eval",
-            lambda retriever, dataset, k: fake_results,
+            lambda retriever, dataset, k, judge=None: fake_results,
         )
         monkeypatch.setattr(
             "wikipod.evaluation.run_eval.build_client",
@@ -537,3 +548,137 @@ def test_main_uses_query_analyzer_when_flag_is_set(tmp_path, monkeypatch):
 
     analyzer = run_eval_mock.call_args.kwargs["analyzer"]
     assert isinstance(analyzer, QueryAnalyzer)
+
+
+def test_main_accepts_llm_judge_flag():
+    runner = CliRunner()
+
+    result = runner.invoke(main, ["--help"])
+
+    assert result.exit_code == 0
+    assert "--use-llm-judge" in result.output
+
+
+def test_main_uses_llm_judge_when_flag_is_set(tmp_path, monkeypatch):
+    runner = CliRunner()
+
+    dataset_path = tmp_path / "eval.yaml"
+    dataset_path.write_text(
+        """
+- query: "Who was George III?"
+  relevant_titles:
+    - "George III"
+"""
+    )
+
+    run_eval_mock = MagicMock(
+        return_value={
+            "k": 5,
+            "mean_recall_at_k": 1.0,
+            "mean_precision_at_k": 0.2,
+            "mean_ndcg_at_k": 1.0,
+            "mean_reciprocal_rank": 1.0,
+            "per_query": [],
+        }
+    )
+
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.run_eval",
+        run_eval_mock,
+    )
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.build_client",
+        lambda config: MagicMock(),
+    )
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.Embedder",
+        MagicMock(),
+    )
+    monkeypatch.setattr(
+        "wikipod.evaluation.run_eval.Retriever",
+        MagicMock(),
+    )
+
+    result = runner.invoke(
+        main,
+        [
+            "--dataset",
+            str(dataset_path),
+            "--top-k",
+            "5",
+            "--use-llm-judge",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "judge" in run_eval_mock.call_args.kwargs
+
+
+def test_run_eval_uses_judge_with_retrieved_chunk_text():
+        retriever = MagicMock()
+        retriever.retrieve.return_value = [_chunk("George III")]
+
+        judge = MagicMock()
+        judge.judge.return_value = MagicMock(
+            relevance_score=3,
+            reasoning="Directly relevant.",
+        )
+
+        dataset = [
+            {
+                "query": "Who was George III?",
+                "relevant_titles": ["George III"],
+            }
+        ]
+
+        run_eval(retriever, dataset, k=1, judge=judge)
+
+        judge.judge.assert_called_once_with(
+            "Who was George III?",
+            "x",
+        )
+
+
+
+def test_run_eval_stores_llm_judge_results():
+    retriever = MagicMock()
+    retriever.retrieve.return_value = [_chunk("George III")]
+
+    judge = MagicMock()
+    judge.judge.return_value = MagicMock(
+        relevance_score=3,
+        reasoning="Directly relevant.",
+    )
+
+    dataset = [
+        {
+            "query": "Who was George III?",
+            "relevant_titles": ["George III"],
+        }
+    ]
+
+    result = run_eval(retriever, dataset, k=1, judge=judge)
+
+    assert result["per_query"][0]["llm_judge_results"] == [
+        {
+            "title": "George III",
+            "relevance_score": 3,
+            "reasoning": "Directly relevant.",
+        }
+    ]
+
+
+def test_run_eval_without_judge_stores_empty_judge_results():
+    retriever = MagicMock()
+    retriever.retrieve.return_value = [_chunk("George III")]
+
+    dataset = [
+        {
+            "query": "Who was George III?",
+            "relevant_titles": ["George III"],
+        }
+    ]
+
+    result = run_eval(retriever, dataset, k=1)
+
+    assert result["per_query"][0]["llm_judge_results"] == []

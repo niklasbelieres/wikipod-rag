@@ -9,6 +9,7 @@ from rich.table import Table
 
 from wikipod.config import get_config
 from wikipod.embeddings.embedder import Embedder
+from wikipod.evaluation.llm_judge import LLMJudge
 from wikipod.evaluation.metrics import (
     mean_reciprocal_rank,
     ndcg_at_k,
@@ -18,6 +19,7 @@ from wikipod.evaluation.metrics import (
 )
 from wikipod.evaluation.query_analyzer import QueryAnalyzer
 from wikipod.indexing.opensearch_client import build_client
+from wikipod.rag.generator import Generator
 from wikipod.rag.retriever import Retriever
 
 console = Console()
@@ -39,6 +41,30 @@ def run_single_query(retriever: Retriever, query: str, k: int) -> list[str]:
     )
 
     return unique_titles[:k]
+
+
+def retrieve_unique_chunks(
+    retriever: Retriever,
+    query: str,
+    k: int,
+) -> list:
+    """Return the first chunk for each of the top-k unique articles."""
+    chunks = retriever.retrieve(query, k=k * 4)
+
+    unique_chunks = []
+    seen_titles = set()
+
+    for chunk in chunks:
+        if chunk.article_title in seen_titles:
+            continue
+
+        seen_titles.add(chunk.article_title)
+        unique_chunks.append(chunk)
+
+        if len(unique_chunks) == k:
+            break
+
+    return unique_chunks
     
 
 
@@ -47,6 +73,7 @@ def run_eval(
     dataset: list[dict],
     k: int,
     analyzer=None,
+    judge=None,
 ) -> dict:
     """Run retrieval evaluation for all queries in the dataset.
     Calculates Recall@k, Precision@k, nDCG@k, and reciprocal rank per query,
@@ -74,10 +101,40 @@ def run_eval(
         for query in queries
     ]
 
-    retrieved_titles = [
-        run_single_query(retriever, query, k)
+    retrieved_chunks = [
+        retrieve_unique_chunks(retriever, query, k)
         for query in retrieval_queries
     ]
+
+    retrieved_titles = [
+        [chunk.article_title for chunk in chunks]
+        for chunks in retrieved_chunks
+    ]
+
+    llm_judge_results = []
+
+    for query, chunks in zip(queries, retrieved_chunks, strict=True):
+        query_judge_results = []
+
+        if judge is not None:
+            for chunk in chunks:
+                judge_result = judge.judge(query, chunk.text)
+                query_judge_results.append(
+                    {
+                        "title": chunk.article_title,
+                        "relevance_score": judge_result.relevance_score,
+                        "reasoning": judge_result.reasoning,
+                    }
+                )
+
+        llm_judge_results.append(query_judge_results)
+
+    retrieved_titles = [
+        [chunk.article_title for chunk in chunks]
+        for chunks in retrieved_chunks
+    ]
+
+
 
     # Pro Query einzeln aufrufen, nicht mit allen Queries auf einmal -- beide
     # Funktionen sind für genau eine Query definiert (siehe Signaturen in metrics.py).
@@ -120,6 +177,7 @@ def run_eval(
             "is_out_of_scope": category == "out_of_scope",
             "relevant_titles": sorted(relevant),
             "retrieved_titles": retrieved,
+            "llm_judge_results": judge_results,
             "recall_at_k": recall,
             "precision_at_k": precision,
             "ndcg_at_k": ndcg,
@@ -131,6 +189,7 @@ def run_eval(
             category,
             relevant,
             retrieved,
+            judge_results,
             recall,
             precision,
             ndcg,
@@ -141,6 +200,7 @@ def run_eval(
             categories,
             relevant_title_sets,
             retrieved_titles,
+            llm_judge_results,
             recall_at_k_values,
             precision_at_k_values,
             ndcg_at_k_values,
@@ -226,6 +286,13 @@ def run_eval(
 )
 
 @click.option(
+    "--use-llm-judge",
+    is_flag=True,
+    default=False,
+    help="Evaluate retrieved results with the LLM judge.",
+)
+
+@click.option(
     "--use-query-analyzer",
     is_flag=True,
     default=False,
@@ -239,6 +306,7 @@ def main(
     csv_output_path: Path | None,
     output_dir: Path | None,
     use_query_analyzer: bool,
+    use_llm_judge: bool,
 ) -> None:
     """Run retrieval evaluation against DATASET_PATH and print all metrics."""
     config = get_config()
@@ -247,15 +315,16 @@ def main(
     embedder = Embedder(config.embeddings.model_name)
     client = build_client(config.opensearch)
     retriever = Retriever(client, config.opensearch.index_name, embedder, top_k=k)
+    judge = LLMJudge(generator=Generator(config.llm)) if use_llm_judge else None
 
     dataset = load_eval_dataset(dataset_path)
     console.print(f"[bold]{len(dataset)} Queries geladen aus[/bold] {dataset_path}")
 
     if use_query_analyzer:
         analyzer = QueryAnalyzer()
-        results = run_eval(retriever, dataset, k, analyzer=analyzer)
+        results = run_eval(retriever, dataset, k, analyzer=analyzer, judge=judge)
     else:
-        results = run_eval(retriever, dataset, k)
+        results = run_eval(retriever, dataset, k, judge=judge)
 
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -278,6 +347,7 @@ def main(
             "category",
             "is_out_of_scope",
             "relevant_titles",
+            "llm_judge_results",
             "retrieved_titles",
             "recall_at_k",
             "precision_at_k",
