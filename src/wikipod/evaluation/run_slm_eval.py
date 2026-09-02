@@ -17,6 +17,7 @@ from __future__ import annotations
 import csv
 import json
 import time
+from datetime import date
 from pathlib import Path
 
 import click
@@ -120,7 +121,10 @@ def write_model_results(output_dir: Path, model_name: str, k: int, per_query: li
     "output_dir",
     required=True,
     type=click.Path(file_okay=False, path_type=Path),
-    help="Directory to write one results.json/results.csv subfolder per model.",
+    help=(
+        "Base directory; results are written under "
+        "<output-dir>/<DD.MM.YY>/<model_stem>/."
+    ),
 )
 def main(dataset_path: Path, models_dir: Path, top_k: int | None, output_dir: Path) -> None:
     """Run each .gguf model in MODELS_DIR against DATASET_PATH and record answers/latency."""
@@ -141,7 +145,8 @@ def main(dataset_path: Path, models_dir: Path, top_k: int | None, output_dir: Pa
         console.print(f"[red]No .gguf files found in {models_dir}[/red]")
         return
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = output_dir / date.today().strftime("%d.%m.%y")
+    run_dir.mkdir(parents=True, exist_ok=True)
 
     summary_rows = []
     for model_path in model_paths:
@@ -157,7 +162,7 @@ def main(dataset_path: Path, models_dir: Path, top_k: int | None, output_dir: Pa
             console.print(f"[red]Skipping {model_path.name}: {exc}[/red]")
             continue
 
-        model_dir = write_model_results(output_dir, model_path.name, k, per_query)
+        model_dir = write_model_results(run_dir, model_path.name, k, per_query)
         mean_latency = sum(entry["latency_seconds"] for entry in per_query) / len(per_query)
         summary_rows.append((model_path.name, mean_latency, len(per_query)))
         console.print(f"[green]Results written to[/green] {model_dir}")
