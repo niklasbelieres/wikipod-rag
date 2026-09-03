@@ -1,0 +1,24 @@
+\chapter{Systemarchitektur}
+\label{ch:architektur}
+
+% Gesamtueberblick, bevor in Kap. 3-7 jede Phase einzeln vertieft wird.
+% Ein Architektur-Diagramm (Pipeline: ZIM -> Selection -> Chunking ->
+% Embedding -> OpenSearch -> Retrieval -> Generation) gehoert hier rein.
+
+\section{Technologie-Stack}
+% KIWIX/ZIM, libzim, BeautifulSoup, sentence-transformers, OpenSearch (k-NN/HNSW),
+% Ollama/llama.cpp, Click/Rich fuer die CLI -- kurz je Technologie, warum diese
+% Wahl (Bezug zur Aufgabenstellung: KIWIX und OpenSearch waren vorgegeben).
+
+\section{Pipeline-Ueberblick}
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=\textwidth]{architektur_diagramm.pdf}
+%     \caption{Ueberblick ueber die WikiPod-Pipeline}
+%     \label{fig:pipeline}
+% \end{figure}
+
+\section{Projektstruktur und Konfiguration}
+% Kurz: config/default.yaml + Umgebungs-Overlays (dev/prod/pi-test), warum
+% dieser Ansatz (ein Ort fuer alle Stellschrauben, nachvollziehbar im Bericht
+% dokumentierbar statt verstreuter Magic Numbers im Code).

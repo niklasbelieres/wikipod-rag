@@ -1,0 +1,36 @@
+\chapter{Dokumentenauswahl}
+\label{ch:dokumentenauswahl}
+% Deckt Ziel 2 der Aufgabenstellung ab: "Entwicklung von Methoden zur
+% Auswahl einer Teilmenge der Wikipedia".
+
+\section{Metadatenextraktion}
+% Welche Metadaten pro Artikel (word_count, link_count, links, categories,
+% html_size_bytes, ...), wie extrahiert (BeautifulSoup, mw-parser-output).
+
+\section{Scoring-Modell}
+% Die 5 Signale (word_count, link_count, importance, incoming_links,
+% pageviews), Formel (log1p-Daempfung + gewichtete Summe), warum diese
+% Kombination. Tabelle mit den tatsaechlich verwendeten Gewichten.
+
+% \begin{table}[H]
+%     \centering
+%     \begin{tabular}{lr}
+%         \toprule
+%         Signal & Gewicht \\
+%         \midrule
+%         word\_count & 0.15 \\
+%         ... & ... \\
+%         \bottomrule
+%     \end{tabular}
+%     \caption{Verwendete Scoring-Gewichte}
+% \end{table}
+
+\section{Budget-constrained Selection}
+% Knapsack-Framing, Greedy-Heuristik (Score/Byte, absteigend sortiert, bis
+% Budget erschoepft), Begruendung warum Greedy statt exaktem Knapsack (NP-hart).
+
+\section{Diskutierte, aber verworfene Erweiterung: Kategorien}
+% Kurz begruenden, warum `categories` nicht ins Scoring eingeflossen ist
+% (siehe PI_SCALING_NOTES.md / scoring.py-Kommentar: bestehende Signale
+% decken die Anforderung ab, sinnvolle Kategorien-Nutzung braeuchte
+% diversitaetsbewusste Selection, kein einfacher Gewichtungsterm).

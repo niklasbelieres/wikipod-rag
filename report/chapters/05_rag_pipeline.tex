@@ -1,0 +1,38 @@
+\chapter{RAG-Generierung}
+\label{ch:rag}
+% Deckt Ziel 4 ab: "Auswahl eines fuer die Hardware geeigneten Sprachmodells"
+% + die eigentliche Antwortgenerierung.
+
+\section{Prompt-Konstruktion}
+% System-Prompt (Grounding-Anweisung: nur aus Kontext antworten, sonst
+% zugeben es nicht zu wissen), Kontext-Budget (Wortzaehlung als Token-Proxy,
+% Bezug zu n\_ctx), Umgang mit leeren Retrieval-Ergebnissen.
+
+\section{Sprachmodell-Auswahl}
+% Kandidaten (z. B. Qwen2.5-1.5B-Instruct, Llama-3.2-1B/3B), Kriterien
+% (RAM-Bedarf, Tokens/s auf ARM, Antwortqualitaet). Vergleichstabelle mit
+% den tatsaechlichen Messwerten -- das ist der zentrale Inhalt dieses
+% Abschnitts, den die Aufgabenstellung explizit verlangt.
+
+% \begin{table}[H]
+%     \centering
+%     \begin{tabular}{lrrr}
+%         \toprule
+%         Modell & RAM (GB) & Tokens/s & Qualitaet (subjektiv) \\
+%         \midrule
+%         Qwen2.5-1.5B-Instruct & ... & ... & ... \\
+%         Llama-3.2-1B-Instruct & ... & ... & ... \\
+%         \bottomrule
+%     \end{tabular}
+%     \caption{Vergleich der evaluierten Sprachmodelle}
+% \end{table}
+
+\section{Backend-Anbindung}
+% Zwei Backends (llama.cpp direkt vs. Ollama), warum beide unterstuetzt
+% werden (Ollama fuer schnelle lokale Entwicklung, llama.cpp naeher am
+% finalen Pi-Deployment ohne separaten Daemon).
+
+\section{Beispielinteraktionen}
+% 1-2 konkrete Query/Antwort-Beispiele mit Quellenangabe, zeigt Grounding
+% in der Praxis (auch negatives Beispiel: Frage ausserhalb des indexierten
+% Bestands, Modell gibt korrekt zu es nicht zu wissen).

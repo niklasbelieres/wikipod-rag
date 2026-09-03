@@ -1,0 +1,35 @@
+\chapter{Deployment auf eingeschraenkter Hardware}
+\label{ch:deployment}
+% Deckt Ziel 1 ab (Bereitstellung der Wikipedia-Kopie) und einen Teil von
+% Ziel 5 (Effizienz auf eingeschraenkter Hardware). Hier gehoert die
+% Raspberry-Pi-Geschichte hin -- vermutlich das inhaltlich ergiebigste
+% Kapitel, da echte Systems-Engineering-Arbeit dahintersteckt.
+
+\section{Zielhardware}
+% Raspberry Pi 5, 16 GB RAM, 1 TB SSD -- kurz die Rahmenbedingungen.
+
+\section{Herausforderung: Speicherbedarf bei voller Korpusgroesse}
+% Die Eskalation in drei Stufen (siehe PI_SCALING_NOTES.md):
+%   1. Worker-lokale Akkumulation -> Batch-Groessen-Fix
+%   2. Volltext des gesamten Korpus im Hauptprozess -> Zwei-Pass-Metadaten
+%   3. Link-Listen selbst als Speicherfresser -> Interning + Streaming-Architektur
+% Fuer jede Stufe: Symptom (Swap/RAM-Metriken aus monitor_run.py), Diagnose,
+% Fix, Ergebnis. Plots aus dem Analyse-Notebook (notebooks/pi_run_analysis.ipynb)
+% hier einbinden -- Swap-Verlauf ueber die Versuche hinweg ist ein starkes Bild.
+
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=0.9\textwidth]{swap_vergleich.pdf}
+%     \caption{Swap-Auslastung ueber die drei Optimierungs-Iterationen}
+% \end{figure}
+
+\section{Entscheidung: Trennung von Build- und Serve-Phase}
+% Begruendung, warum die Indexierung des vollen Dumps auf leistungsstaerkerer
+% Hardware sinnvoll und mit der Aufgabenstellung vereinbar ist (die
+% Aufgabenstellung verlangt ein auf dem Pi lauffaehiges *Ergebnis*, nicht
+% zwingend einen auf dem Pi laufenden Build-Prozess). Mechanik: Snapshot/
+% Restore zwischen Build-Server und Pi.
+
+\section{Monitoring-Infrastruktur}
+% Kurz: monitor\_run.py (Load/RAM/Swap/Temperatur/Throttling), warum
+% stdlib-only (kein zusaetzlicher Install-Schritt auf dem Pi noetig).

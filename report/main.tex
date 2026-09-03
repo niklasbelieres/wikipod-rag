@@ -1,0 +1,123 @@
+% =============================================================================
+% WikiPod -- Abschlussbericht (PIB-PA SoSe 2026)
+%
+% Vorgabe des Betreuers: 20-30 Seiten, Architektur + Designentscheidungen +
+% Vorgehensweise + Ergebnisse, plus eine kurze Setup-Anleitung fuer
+% Folgeprojekte. Kapitel liegen als eigene Dateien unter chapters/ -- bei
+% 3 Autoren vermeidet das Merge-Konflikte, wenn jeder an einem eigenen
+% Kapitel schreibt.
+%
+% Grober Seiten-Richtwert (bei ~25 Seiten Zielumfang, exkl. Titelseite/
+% Inhaltsverzeichnis/Literatur/Anhang): passt die Gewichtung an, je nachdem
+% wo eure Arbeit inhaltlich am meisten hergibt.
+%   1 Einleitung              ~1-2 Seiten
+%   2 Architektur             ~2-3 Seiten
+%   3 Dokumentenauswahl       ~3-4 Seiten
+%   4 Indexierung             ~3-4 Seiten
+%   5 RAG-Pipeline            ~3-4 Seiten
+%   6 Deployment auf dem Pi   ~3-4 Seiten (die OOM-Debugging-Geschichte gehoert hierhin)
+%   7 Evaluation              ~3-4 Seiten
+%   8 Anleitung/Setup         ~1-2 Seiten
+%   9 Diskussion              ~1-2 Seiten
+%  10 Fazit & Ausblick        ~1 Seite
+% =============================================================================
+
+\documentclass[a4paper,11pt,twoside]{scrreprt}
+
+% -- Sprache & Encoding --------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[ngerman]{babel}
+\usepackage[T1]{fontenc}
+
+% -- Seitenlayout ---------------------------------------------------------------
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% -- Grafiken & Abbildungen ------------------------------------------------------
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{subcaption}
+\graphicspath{{images/}}
+
+% -- Tabellen ---------------------------------------------------------------------
+\usepackage{booktabs}
+\usepackage{array}
+
+% -- Code-Listings (z. B. CLI-Aufrufe, Config-Ausschnitte, Python-Snippets) --------
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{teal},
+    tabsize=2,
+    captionpos=b,
+}
+
+% -- Abkuerzungsverzeichnis (RAG, LLM, ZIM, HNSW, MRR, ...) -----------------------
+\usepackage{acronym}
+
+% -- Literaturverzeichnis -----------------------------------------------------------
+\usepackage[backend=biber,style=numeric,sorting=none]{biblatex}
+\addbibresource{references.bib}
+
+% -- Links & Querverweise (immer als letztes Paket laden) --------------------------
+\usepackage{hyperref}
+\usepackage{cleveref}
+
+% -- TODOs waehrend des Schreibens sichtbar markieren (vor der Abgabe entfernen) ---
+\usepackage[colorinlistoftodos]{todonotes}
+
+\title{
+    WikiPod: Dokumentenauswahl und Retrieval-Augmented-Generation\\
+    \large Projektarbeit (PIB-PA SoSe 2026)
+}
+\author{
+    Vorname Nachname \and
+    Vorname Nachname \and
+    Vorname Nachname
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    % 150-250 Woerter: Problemstellung (Offline-Zugang zu Wikipedia auf
+    % eingeschraenkter Hardware), Ansatz (Auswahl + Vektorindex + RAG),
+    % wichtigste Ergebnisse in Kurzform. Am besten ganz zum Schluss
+    % schreiben, wenn der Rest steht.
+    \todo[inline]{Abstract zuletzt schreiben.}
+\end{abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+% Optional, falls ihr ein Abkuerzungsverzeichnis wollt -- siehe acronyms.tex
+% \input{chapters/00_acronyms}
+
+\include{chapters/01_einleitung}
+\include{chapters/02_architektur}
+\include{chapters/03_dokumentenauswahl}
+\include{chapters/04_indexierung}
+\include{chapters/05_rag_pipeline}
+\include{chapters/06_deployment}
+\include{chapters/07_evaluation}
+\include{chapters/08_anleitung}
+\include{chapters/09_diskussion}
+\include{chapters/10_fazit}
+
+\printbibliography
+
+\appendix
+\include{chapters/a1_anhang}
+
+\end{document}

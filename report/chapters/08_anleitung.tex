@@ -1,0 +1,35 @@
+\chapter{Anleitung: Inbetriebnahme}
+\label{ch:anleitung}
+% Explizit vom Betreuer gewuenscht: kurze Anleitung fuer Folgeprojekte, wie
+% man die Loesung zum Laufen bekommt. Bewusst knapp halten (1-2 Seiten) --
+% Verweis auf README/Repo fuer Details, hier nur der rote Faden.
+
+\section{Voraussetzungen}
+% Python-Version, Docker, ggf. Ollama/llama-cpp-python, Hardware-Hinweise.
+
+\section{Installation}
+\begin{lstlisting}[language=bash]
+git clone <repo-url>
+cd wikipod-rag
+pip install -e ".[dev]"
+\end{lstlisting}
+
+\section{Lokales Setup (Entwicklung)}
+\begin{lstlisting}[language=bash]
+docker compose up -d          % OpenSearch lokal starten
+wikipod index                 % Testkorpus indexieren
+wikipod query "..."           % Beispiel-Anfrage
+\end{lstlisting}
+
+\section{Konfiguration}
+% Kurzer Verweis auf config/default.yaml + Environment-Overlays
+% (dev/prod/pi-test), WIKIPOD\_ENV-Variable.
+
+\section{Deployment auf dem Raspberry Pi}
+% Kurzfassung aus Kapitel 6: ZIM-Datei platzieren, prod.yaml anpassen,
+% Docker/OpenSearch-Heap-Groesse, ggf. Hinweis auf Build/Serve-Trennung.
+
+\section{Evaluation ausfuehren}
+\begin{lstlisting}[language=bash]
+wikipod evaluate --dataset test/data/eval_queries.yaml
+\end{lstlisting}

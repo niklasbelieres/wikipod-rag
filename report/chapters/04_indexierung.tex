@@ -1,0 +1,30 @@
+\chapter{Vektorindexierung mit OpenSearch}
+\label{ch:indexierung}
+% Deckt Ziel 3 ab: "Indexierung der ausgewaehlten Teilmenge als dichte
+% Vektoren mittels OpenSearch".
+
+\section{Chunking-Strategie}
+% Section-basiertes Chunking (nicht ganze Artikel), max_words/overlap,
+% Begruendung (Chunk soll nicht mehrere Themen mischen).
+
+\section{Embedding-Modell}
+% sentence-transformers/all-MiniLM-L6-v2, Dimension 384, warum dieses Modell
+% (Groesse/Qualitaets-Tradeoff fuer eingeschraenkte Hardware).
+
+\section{OpenSearch-Index-Design}
+% k-NN-Mapping (HNSW, nmslib-Engine, cosinesimil), warum HNSW statt exaktem
+% k-NN. Ggf. Parameter-Tuning-Ergebnisse (ef\_construction, m).
+
+\section{Skalierung auf den vollen Korpus}
+% Das ist der Kern eurer technischen Arbeit -- ausfuehrlich behandeln:
+%   - Erstes Problem: Worker halten ganze Bereiche im Speicher -> Batch-Fix
+%   - Zweites Problem: Volltext des gesamten Korpus im Hauptprozess -> Zwei-Pass
+%     (include_sections=False fuer Scoring, gezieltes Nachladen fuer Selektion)
+%   - Drittes Problem: Link-Listen selbst zu gross -> Interning + Cross-Prozess-
+%     Reintern + Zwei-Pass-Streaming-Architektur (JSONL-Cache)
+% Siehe PI_SCALING_NOTES.md fuer die volle Herleitung -- hier komprimiert
+% darstellen, mit Verweis auf Kapitel 6 (Deployment) fuer die Hardware-Seite
+% der Geschichte (Absturz, Diagnose, Serverloesung).
+
+\section{Retrieval}
+% Query-Embedding + k-NN-Suche, Retriever-Klasse als Abstraktionsschicht.
