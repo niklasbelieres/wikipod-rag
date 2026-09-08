@@ -1,0 +1,13 @@
+# Overrides for local development. Only list keys that differ from default.yaml.
+
+paths:
+  zim_file: "test/data/wikipedia_en_100_2026-08.zim"
+
+selection:
+  storage_budget_mb: 500 #had to increase this from 50->500 because of evaluation testing
+
+opensearch:
+  index_name: "wikipod-chunks-dev"
+
+llm:
+  backend: ollama

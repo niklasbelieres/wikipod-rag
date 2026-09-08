@@ -8,19 +8,350 @@
 % warum diese beiden (ergaenzen sich: "gefunden ueberhaupt" vs. "wie weit
 % oben platziert"). Eval-Datensatz (Anzahl Fragen, Herkunft/Kuratierung).
 
+Zur Bewertung der Retrieval-Qualitaet wurden zwei manuell
+zusammengestellte Evaluationsdatensaetze verwendet. Der regulaere
+Evaluationsdatensatz umfasst 20 natuerlichsprachliche Suchanfragen aus
+verschiedenen Themenbereichen, darunter Geschichte, Politik und Gesellschaft,
+Biologie und Medizin, Naturwissenschaften, Geografie, Technologie und Kultur.
+Fuer jede Anfrage wurde ein erwarteter Wikipedia-Artikel als Ground Truth
+hinterlegt.
+
+Ergaenzend wurde ein separater Edge-Case-Datensatz erstellt. Dieser enthaelt
+gezielt Anfragen, bei denen besondere Schwierigkeiten fuer das Retrieval zu
+erwarten sind. Dazu gehoeren aehnlich benannte Entitaeten, Aliase beziehungsweise
+alternative Bezeichnungen, Tippfehler, sehr kurze Suchanfragen sowie eine
+Anfrage zu einem Thema ausserhalb des verwendeten Korpus. Die Edge Cases wurden getrennt
+vom regulaeren Evaluationsdatensatz betrachtet, da sie nicht die allgemeine
+Retrieval-Qualitaet abbilden, sondern gezielt das Verhalten des Systems in
+problematischen Situationen untersuchen.
+
+Als Retrieval-Ergebnis werden die ersten $k$ unterschiedlichen
+Wikipedia-Artikel betrachtet. Da ein Artikel im Vektorindex durch mehrere
+Text-Chunks repraesentiert werden kann, werden mehrere Treffer desselben
+Artikels bei der Evaluation zu einem Artikeltreffer zusammengefasst.
+
+Zur quantitativen Bewertung werden Recall@k, Precision@k, nDCG@k und der
+Mean Reciprocal Rank (MRR) verwendet. Recall@k beschreibt den Anteil der
+relevanten Artikel, die innerhalb der ersten $k$ Ergebnisse gefunden werden.
+Precision@k misst den Anteil relevanter Treffer unter den ersten $k$
+Ergebnissen. nDCG@k beruecksichtigt zusaetzlich die Position eines relevanten
+Treffers und bewertet frueher platzierte Treffer hoeher. Der Reciprocal Rank
+entspricht dem Kehrwert des Rangs des ersten relevanten Treffers; der MRR
+bildet den Mittelwert dieses Wertes ueber alle Evaluationsanfragen.
+
+Formal sei $G$ die Menge der relevanten Ground-Truth-Artikel und
+$R_k$ die Menge der ersten $k$ Retrieval-Ergebnisse. Dann ist Recall@k
+definiert als
+
+\[
+\mathrm{Recall@k} = \frac{|R_k \cap G|}{|G|},
+\]
+
+waehrend Precision@k durch
+
+\[
+\mathrm{Precision@k} = \frac{|R_k \cap G|}{k}
+\]
+
+gegeben ist. Fuer nDCG@k wird die Position relevanter Treffer
+beruecksichtigt. Bei binaerer Relevanz wird zunaechst
+
+\[
+\mathrm{DCG@k} =
+\sum_{i=1}^{k}
+\frac{\mathrm{rel}_i}{\log_2(i+1)}
+\]
+
+berechnet und anschliessend durch den idealen DCG-Wert normalisiert:
+
+\[
+\mathrm{nDCG@k} =
+\frac{\mathrm{DCG@k}}{\mathrm{IDCG@k}}.
+\]
+
+Der Reciprocal Rank einer Anfrage ist
+
+\[
+\mathrm{RR} = \frac{1}{r},
+\]
+
+wobei $r$ dem Rang des ersten relevanten Treffers entspricht. Wird kein
+relevanter Artikel gefunden, ist der Wert 0. Der Mean Reciprocal Rank ergibt
+sich als Mittelwert der Reciprocal-Rank-Werte ueber alle Anfragen.
+
+Die Metriken betrachten unterschiedliche Aspekte der Retrieval-Qualitaet.
+Recall@k zeigt, ob die relevanten Artikel innerhalb der betrachteten
+Ergebnisse gefunden werden, waehrend Precision@k den Anteil relevanter
+Treffer innerhalb dieser Ergebnisse beschreibt. nDCG@k und MRR
+beruecksichtigen zusaetzlich die Rangposition und unterscheiden damit
+zwischen relevanten Treffern, die frueh oder erst spaeter in der
+Ergebnisliste erscheinen.
+
 \section{Effektivitaet: Ergebnisse}
 % Tabelle mit Recall@k / MRR-Werten, ggf. pro Kategorie der Eval-Fragen
 % aufgeschluesselt (Personalities/History/Politics/...).
+
+Für den regulären Evaluationsdatensatz wurde das Retrieval zunächst mit
+$k=5$ und anschließend mit $k=10$ ausgewertet. Bei beiden Einstellungen
+wurden für alle 20 Anfragen die jeweils als relevant definierten
+Wikipedia-Artikel innerhalb der betrachteten Treffer gefunden. Damit wurde
+sowohl für $k=5$ als auch für $k=10$ ein mittlerer Recall von $1{,}000$
+erreicht. Der MRR betrug in beiden Fällen $0{,}950$, der mittlere nDCG-Wert
+$0{,}963$.
+
+\begin{table}[ht]
+    \centering
+    \caption{Retrieval-Ergebnisse des regulaeren Evaluationsdatensatzes}
+    \label{tab:retrieval-regulaer}
+    \begin{tabular}{lrrrr}
+        \toprule
+        Einstellung & Recall@k & Precision@k & nDCG@k & MRR \\
+        \midrule
+        $k=5$  & 1,000 & 0,200 & 0,963 & 0,950 \\
+        $k=10$ & 1,000 & 0,100 & 0,963 & 0,950 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Die mittlere Precision betrug bei $k=5$ $0{,}200$ und bei $k=10$
+$0{,}100$. Dieser Rückgang ist durch die Struktur des Evaluationsdatensatzes
+zu erklären: Für jede der 20 Anfragen ist genau ein relevanter
+Ground-Truth-Artikel definiert. Wird dieser gefunden, beträgt die
+Precision daher bei fünf betrachteten Ergebnissen $1/5$ und bei zehn
+betrachteten Ergebnissen $1/10$. Die Erhöhung von $k$ von 5 auf 10 führte
+somit auf diesem Datensatz zu keiner Verbesserung von Recall, nDCG oder MRR.
+
+Zusätzlich wurde das Retrieval auf dem separaten Edge-Case-Datensatz mit
+zwölf Anfragen bei $k=5$ untersucht. Ohne Query Analyzer wurden ein
+mittlerer Recall@5 von $0{,}833$, eine Precision@5 von $0{,}167$, ein
+nDCG@5 von $0{,}803$ und ein MRR von $0{,}792$ erreicht. Mit aktiviertem Query Analyzer stiegen diese Werte auf $0{,}917$, $0{,}183$,
+$0{,}886$ beziehungsweise $0{,}875$. Gegenueber der Baseline entspricht dies
+einer absoluten Verbesserung von $0{,}083$ bei Recall@5, nDCG@5 und MRR sowie
+von $0{,}017$ bei Precision@5.
+
+\begin{table}[ht]
+    \centering
+    \caption{Retrieval-Ergebnisse auf dem Edge-Case-Datensatz bei $k=5$}
+    \label{tab:retrieval-edge-cases}
+    \begin{tabular}{lrrrr}
+        \toprule
+        Einstellung & Recall@5 & Precision@5 & nDCG@5 & MRR \\
+        \midrule
+        Ohne Query Analyzer & 0,833 & 0,167 & 0,803 & 0,792 \\
+        Mit Query Analyzer  & 0,917 & 0,183 & 0,886 & 0,875 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Die Verbesserung ist in diesem Versuch auf die Anfrage
+\texttt{Cathlic Chuch} zurückzuführen. Ohne Vorverarbeitung wurde der
+erwartete Artikel innerhalb der ersten fünf Ergebnisse nicht gefunden.
+Der Query Analyzer normalisierte diese Anfrage zu
+\texttt{Catholic Church}; anschließend wurde der erwartete Artikel auf
+Rang 1 gefunden. Andere untersuchte Edge Cases, beispielsweise
+\texttt{Who was George IV?}, wurden durch diese Normalisierung nicht
+verändert.
+
+Der Edge-Case-Datensatz enthält außerdem eine als Out-of-Scope markierte
+Anfrage zu Albert Einstein, für die kein relevanter Ground-Truth-Artikel
+definiert ist. Die aktuelle Implementierung der klassischen
+Retrieval-Metriken weist einer Anfrage ohne relevante Ground-Truth-Titel
+den Wert 0 zu. Dieser Fall ist daher nicht als gewöhnlicher
+Retrieval-Fehler zu interpretieren und muss bei der Einordnung der
+aggregierten Edge-Case-Werte gesondert berücksichtigt werden.
 
 \section{Effizienz: Indexierung}
 % Dauer, Speicherbedarf (Peak RAM/Swap), Indexgroesse auf Platte im
 % Verhaeltnis zur ZIM-Groesse -- Zahlen aus run\_metrics.csv +
 % Analyse-Notebook.
 
+Die Ressourcennutzung während eines Indexierungslaufs auf dem Raspberry Pi
+wurde in Intervallen von zehn Sekunden aufgezeichnet. Erfasst wurden unter
+anderem die systemweite Speichernutzung, der RSS-Speicherbedarf des
+WikiPod-Prozesses und von OpenSearch, die Swap-Nutzung sowie CPU-Temperatur
+und Systemlast.
+
+Während der aufgezeichneten Messung lag die maximale systemweite
+Speichernutzung bei $6224{,}3$ MB. Für den WikiPod-Prozess wurde ein
+maximaler RSS-Wert von $2871{,}1$ MB und für OpenSearch ein maximaler
+RSS-Wert von $4731{,}6$ MB gemessen. Die beiden RSS-Maximalwerte traten
+nicht notwendigerweise zum selben Zeitpunkt auf und werden daher nicht
+addiert. Während der gesamten Messung wurde kein Swap-Speicher verwendet.
+Die höchste gemessene CPU-Temperatur betrug $71{,}4\,^\circ$C.
+
+Die Monitoring-Aufzeichnung umfasst insgesamt 62 Messpunkte über einen
+Zeitraum von etwa $10{,}2$ Minuten. Dieser Zeitraum ist nicht mit der
+exakten Indexierungsdauer gleichzusetzen, da das Monitoring vor dem
+eigentlichen Lauf gestartet und nach dessen Ende beendet wurde.
+
+Ergaenzend wurde die Indexierungsdauer auf dem Raspberry Pi in einem
+separaten Lauf direkt als Wall-Clock-Zeit gemessen. Hierfuer wurde derselbe
+Top-100-ZIM-Korpus mit 194 Artikeln verwendet. Bei einem konfigurierten
+Speicherbudget von $500$ MB wurden $61{,}6$ MB Inhalt ausgewaehlt und
+insgesamt 3875 Text-Chunks erzeugt und in einen separaten OpenSearch-Index
+geschrieben. Die gesamte Indexierung dauerte $606{,}76$ Sekunden, entsprechend
+etwa $10$ Minuten und $7$ Sekunden.
+
+Ergaenzend wurde die Indexierung des fuer die Retrieval-Evaluation verwendeten
+Top-100-ZIM-Korpus lokal reproduziert. Aus dem Korpus wurden 194 von 194
+verfuegbaren Artikeln ausgewaehlt. Der dabei beruecksichtigte Inhalt umfasste
+$61{,}6$ MB bei einem konfigurierten Speicherbudget von $500$ MB. Aus den
+Artikeln wurden insgesamt 3875 Text-Chunks erzeugt und in OpenSearch
+indexiert. Der resultierende OpenSearch-Index enthielt entsprechend 3875
+Dokumente und belegte $42{,}1$ MB Speicherplatz.
+
+Dieser lokale Lauf dient der Reproduzierbarkeit der fuer die
+Retrieval-Evaluation verwendeten Indexbasis. Die zuvor beschriebenen
+Ressourcenmessungen stammen dagegen vom Raspberry Pi und werden daher nicht
+direkt mit den lokal gemessenen Werten vermischt.
+
+
 \section{Effizienz: Anfragebearbeitung}
 % Query-Latenz (Retrieval + Generierung getrennt ausweisen), RAM waehrend
 % des Betriebs (nicht der Indexierung).
 
+Die Latenz der Retrieval-Stufe wurde zusaetzlich in einem lokalen
+Reproduktionslauf mit den 20 Anfragen des regulaeren Evaluationsdatensatzes
+und $k=5$ gemessen. Dabei wurde jeweils der vollstaendige Aufruf der
+Retrieval-Komponente erfasst, der sowohl die Berechnung des Query-Embeddings
+als auch die anschliessende k-NN-Suche in OpenSearch umfasst. Ein
+vorangestellter Warm-up-Aufruf wurde nicht in die Messwerte einbezogen.
+
+Die mittlere Retrieval-Latenz betrug $27{,}13$ ms pro Anfrage, bei einem
+Median von $28{,}73$ ms. Die gemessenen Einzelwerte lagen zwischen
+$15{,}99$ ms und $41{,}26$ ms. Da diese Messung auf dem lokalen
+Entwicklungssystem und nicht auf dem Raspberry Pi durchgefuehrt wurde,
+dienen die Werte der Charakterisierung des Evaluationsaufbaus und sind
+nicht als Laufzeitmessung der Zielhardware zu interpretieren.
+
+Die gleiche Retrieval-Messung wurde anschliessend auf dem Raspberry Pi
+wiederholt. Verwendet wurden ebenfalls die 20 Anfragen des regulaeren
+Evaluationsdatensatzes, $k=5$ und ein vorangestellter Warm-up-Aufruf, der
+nicht in die Messwerte einbezogen wurde. Gemessen wurde wiederum der
+vollstaendige Aufruf der Retrieval-Komponente einschliesslich
+Query-Embedding und k-NN-Suche in OpenSearch.
+
+Auf dem Raspberry Pi betrug die mittlere Retrieval-Latenz $62{,}78$ ms
+pro Anfrage bei einem Median von $53{,}76$ ms. Die Einzelwerte lagen
+zwischen $46{,}40$ ms und $115{,}56$ ms. Damit lag die mittlere
+Retrieval-Latenz in diesem Versuchsaufbau auf dem Raspberry Pi etwa beim
+$2{,}31$-Fachen des lokal gemessenen Mittelwerts von $27{,}13$ ms.
+
+Zur Untersuchung der Generierungslatenz wurden auf dem Raspberry Pi drei
+lokale Sprachmodelle im GGUF-Format verglichen. Fuer jedes Modell wurden
+dieselben 20 Anfragen des regulaeren Evaluationsdatensatzes verwendet.
+Das Retrieval wurde dabei einmal pro Anfrage ausgefuehrt und fuer alle
+Modelle wiederverwendet. Die gemessene Zeit umfasst daher ausschliesslich
+den Aufruf der Generierung und nicht die Retrieval-Latenz.
+
+\begin{table}[ht]
+    \centering
+    \caption{Mittlere Generierungslatenz lokaler Sprachmodelle auf dem Raspberry Pi}
+    \label{tab:pi-generation-latency}
+    \begin{tabular}{lrr}
+        \toprule
+        Modell & Modellgroesse & Mittlere Latenz \\
+        \midrule
+        Llama 3.2 1B Q4 & 771 MB & 29,18 s \\
+        Phi-3.5 Mini Q4 & 2,3 GB & 152,33 s \\
+        Qwen2.5 1.5B Q4 & 1,1 GB & 27,97 s \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+In diesem Versuchsaufbau erreichte Qwen2.5 1.5B mit $27{,}97$ Sekunden
+die niedrigste mittlere Generierungslatenz, knapp vor Llama 3.2 1B mit
+$29{,}18$ Sekunden. Phi-3.5 Mini benoetigte mit $152{,}33$ Sekunden
+deutlich mehr Zeit. Die Messung bewertet ausschliesslich die Laufzeit der
+Generierung; aus diesen Werten kann keine Aussage ueber die Qualitaet der
+generierten Antworten abgeleitet werden.
+
+Ergaenzend wurde die Ressourcennutzung waehrend einer einzelnen
+Generierung mit Qwen2.5 1.5B auf dem Raspberry Pi in Intervallen von zwei
+Sekunden aufgezeichnet. Die Generierung dauerte in diesem Lauf
+$27{,}42$ Sekunden. Die systemweite Speichernutzung stieg von
+$4577{,}8$ MB vor der Generierung auf maximal $5770{,}7$ MB und lag am
+Ende der Messung bei $4593{,}5$ MB. Gegenueber dem Ausgangswert entspricht
+dies einem Anstieg bis zum Maximum von etwa $1192{,}9$ MB.
+
+Die Swap-Belegung lag bereits vor Beginn der Generierung bei etwa
+$2048$ MB. Waehrend des Messzeitraums wurden zwei zusaetzliche
+Swap-In-Seiten und keine Swap-Out-Seiten registriert. Die bereits
+vorhandene Swap-Belegung kann daher nicht der untersuchten Generierung
+zugeschrieben werden. Die CPU-Temperatur stieg waehrend der Messung von
+$44{,}4\,^\circ$C auf maximal $56{,}0\,^\circ$C und lag am Ende bei
+$46{,}1\,^\circ$C.
+
+Der separat erfasste RSS-Wert des WikiPod-Prozesses bildet in diesem Lauf
+den Speicherbedarf der eigentlichen Modellgenerierung nicht verlaesslich
+ab. Aus diesem Grund wird fuer diese Messung nur die Veraenderung der
+systemweiten Speichernutzung berichtet und nicht daraus auf den
+prozessspezifischen Speicherbedarf des Sprachmodells geschlossen.
+
 \section{Einordnung der Ergebnisse}
 % Wo liegen die Grenzen (Korpusgroesse, Modellgroesse), was wuerde sich mit
 % mehr Zeit/Ressourcen noch verbessern lassen.
+
+Die Ergebnisse zeigen fuer den regulaeren Evaluationsdatensatz eine hohe
+Retrieval-Qualitaet. Die Aussagekraft ist jedoch durch den Umfang des
+Evaluationsaufbaus begrenzt. Der regulaere Datensatz umfasst lediglich
+20 Anfragen und definiert fuer jede Anfrage genau einen relevanten
+Ground-Truth-Artikel. Die gemessenen Werte sind daher als Ergebnis dieses
+konkreten Evaluationsdatensatzes zu verstehen und erlauben keine allgemeine
+Aussage ueber beliebige Wikipedia-Anfragen.
+
+Auch der verwendete Korpus ist begrenzt. Fuer die reproduzierte
+Retrieval-Evaluation wurde eine Top-100-ZIM-Datei mit einer Dateigroesse von
+318 MB verwendet. Beim Einlesen wurden daraus 194 Artikel verarbeitet und
+3875 Chunks erzeugt. Die Ergebnisse koennen deshalb nicht unmittelbar auf
+einen wesentlich groesseren Wikipedia-Korpus uebertragen werden.
+
+Der Edge-Case-Datensatz verdeutlicht zudem, dass die aggregierten Metriken
+von der Definition der Ground Truth abhaengen. Insbesondere erhaelt die
+Out-of-Scope-Anfrage ohne relevante Ground-Truth-Titel in der aktuellen
+Implementierung fuer die klassischen Retrieval-Metriken jeweils den Wert
+0. Sie muss deshalb getrennt von gewoehnlichen Retrieval-Fehlern
+interpretiert werden.
+
+Der zusätzlich eingesetzte LLM-Judge erwies sich in der aktuellen
+Konfiguration nur eingeschränkt als quantitative Bewertungsmetrik. In einem
+frischen Lauf auf dem Edge-Case-Datensatz wurden insgesamt 22 Retrieval-
+Ergebnisse bewertet. Dabei vergab der Judge viermal den Wert 0, zweimal den
+Wert 1, fünfzehnmal den Wert 2 und einmal den Wert 3 auf einer Skala von 0
+bis 3.
+
+Die Einzelbewertungen zeigen jedoch mehrere Inkonsistenzen. So wurde bei der
+Anfrage \texttt{Who was George IV?} auch ein Treffer zum Artikel
+\texttt{George III} mit 2 von 3 Punkten bewertet. Bei der Anfrage \texttt{Cathlic Chuch} wurde der nach der
+Retrieval-Normalisierung korrekt gefundene Artikel \texttt{Catholic Church}
+dagegen mit 0 Punkten bewertet. Der Judge erhielt dabei die urspruengliche
+Anfrage und nicht die fuer das Retrieval normalisierte Form. Auch bei der als
+Out-of-Scope definierten Anfrage zu Albert Einstein erhielt ein Treffer zum
+Artikel \texttt{Martin Luther King Jr.} 2 Punkte. Die Judge-Bewertungen werden
+daher nicht als gleichwertige quantitative Qualitätsmetrik neben Recall,
+nDCG und MRR verwendet, sondern als experimentelle Ergänzung betrachtet.
+
+Die Messungen auf dem Raspberry Pi zeigen zudem deutliche Unterschiede
+zwischen Retrieval und Antwortgenerierung hinsichtlich der Laufzeit. Die
+mittlere Retrieval-Latenz lag mit $62{,}78$ ms deutlich unter einer Sekunde,
+waehrend die untersuchten lokalen Sprachmodelle fuer die Generierung einer
+Antwort im Mittel zwischen $27{,}97$ s und $152{,}33$ s benoetigten. In dem
+untersuchten Aufbau stellt damit die lokale Sprachmodellgenerierung den
+zeitlich dominierenden Teil der Anfragebearbeitung dar.
+
+Auch zwischen den untersuchten Sprachmodellen bestanden deutliche
+Laufzeitunterschiede. Qwen2.5 1.5B erreichte mit $27{,}97$ s die niedrigste
+mittlere Generierungslatenz, gefolgt von Llama 3.2 1B mit $29{,}18$ s.
+Phi-3.5 Mini benoetigte dagegen im Mittel $152{,}33$ s. Da in diesem
+Modellvergleich keine quantitative Qualitaetsmetrik fuer die generierten
+Antworten erhoben wurde, laesst sich aus der geringeren Latenz allein keine
+Aussage ueber die Eignung eines Modells hinsichtlich der Antwortqualitaet
+ableiten.
+
+Die Ressourcenmessung einer einzelnen Qwen2.5-Generierung zeigte einen
+Anstieg der systemweiten Speichernutzung um maximal etwa $1{,}19$ GB
+gegenueber dem Ausgangswert. Dabei wurde keine relevante zusaetzliche
+Swap-Out-Aktivitaet beobachtet. Da der prozessspezifische Speicherbedarf
+der Modellgenerierung in dieser Messung nicht verlaesslich erfasst wurde,
+ist dieser Wert als Veraenderung der gesamten Systemspeichernutzung und
+nicht als direkter Speicherbedarf des Modells zu interpretieren.
