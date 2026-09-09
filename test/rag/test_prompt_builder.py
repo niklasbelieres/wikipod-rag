@@ -211,7 +211,12 @@ def test_fit_to_budget_with_zero_budget_returns_empty_list():
 def test_build_messages_returns_system_and_user_roles_in_order():
     messages = build_messages("What causes climate change?", [])
 
-    assert [message["role"] for message in messages] == ["system", "user"]
+    assert [message["role"] for message in messages] == [
+        "system",
+        "user",
+        "assistant",
+        "user",
+    ]
     assert messages[0]["content"] == SYSTEM_PROMPT
 
 
@@ -227,7 +232,7 @@ def test_build_messages_user_content_contains_query_and_formatted_context():
     query = "What causes climate change?"
 
     messages = build_messages(query, [chunk])
-    user_content = messages[1]["content"]
+    user_content = messages[-1]["content"]
 
     assert f"Question: {query}" in user_content
     assert format_context([chunk]) in user_content
@@ -235,7 +240,7 @@ def test_build_messages_user_content_contains_query_and_formatted_context():
 
 def test_build_messages_with_no_chunks_uses_fallback_context_text():
     messages = build_messages("unrelated query", [])
-    user_content = messages[1]["content"]
+    user_content = messages[-1]["content"]
 
     assert "No relevant excerpts were found" in user_content
     assert "Question: unrelated query" in user_content
@@ -262,7 +267,7 @@ def test_build_messages_respects_max_context_words_truncation():
     )
 
     messages = build_messages("query", [small_chunk, large_chunk], max_context_words=10)
-    user_content = messages[1]["content"]
+    user_content = messages[-1]["content"]
 
     assert small_chunk.text in user_content
     assert large_chunk.text not in user_content
@@ -282,7 +287,7 @@ def test_build_messages_uses_default_max_context_words_when_not_given():
     ]
 
     messages = build_messages("query", chunks)
-    user_content = messages[1]["content"]
+    user_content = messages[-1]["content"]
 
     assert chunks[0].text in user_content
     assert chunks[1].text not in user_content
