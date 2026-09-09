@@ -54,3 +54,38 @@ Thumbs.db
 
 # Requirements lock (keep requirements.txt, ignore compiled)
 requirements.in
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.log
+
+# LaTeX temporary files
+*.nav
+*.snm
+*.vrb
+*.idx
+*.ilg
+*.ind
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.ist
+
+# Build output
+*.pdf
+
+*.md

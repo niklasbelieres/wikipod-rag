@@ -3,15 +3,76 @@
 % Deckt Ziel 3 ab: "Indexierung der ausgewaehlten Teilmenge als dichte
 % Vektoren mittels OpenSearch".
 
+Damit die im vorherigen Pipeline-Schritt ausgewählte Wikipedia-Teilmenge von einem Large-Language-Modell genutzt
+werden kann, müssen diese Artikel zunächst in geeignete Textabschnitte (Chunks) unterteilt werden, bevor diese
+als dichte Vektoren indexiert werden können. Die Aufteilung ermöglicht eine granularere Suche nach relevanten
+Informationen, da bei einer Anfrage nicht zwangsläufig ein vollständiger Wikipedia-Artikel, sondern gezielt
+relevante Textpassagen als Kontext für das Large-Language-Modell abgerufen werden können. Die Verwendung von
+Textpassagen als Retrieval-Einheiten stellt dabei einen etablierten Ansatz im Dense Retrieval dar
+~\cite{karpukhin-etal-2020-dense}.
+
 \section{Chunking-Strategie}
-% Section-basiertes Chunking (nicht ganze Artikel), max_words/overlap,
-% Begruendung (Chunk soll nicht mehrere Themen mischen).
+\label{sec:chunking-strategie}
+
+Die Zerlegung der Wikipedia-Artikel erfolgt abschnittsweise. Hierzu iteriert die Methode
+\texttt{chunk\_article()} über die in \texttt{article.sections} enthaltenen Abschnitte. Dadurch wird
+sichergestellt, dass ein Chunk ausschließlich Text aus einem einzelnen Wikipedia-Abschnitt enthält und
+der inhaltliche Zusammenhang der jeweiligen Passage erhalten bleibt.
+
+Innerhalb eines Abschnitts werden die Texte mit einer maximalen Fenstergröße von 250 Wörtern und einer
+Überlappung von 40 Wörtern unterteilt. Die Wahl der Chunk-Größe stellt einen Kompromiss zwischen der
+Granularität des Retrievals und dem Erhalt ausreichenden Kontextes dar. Untersuchungen zeigen, dass die
+optimale Chunk-Größe von der Charakteristik der Daten, der konkreten Retrieval-Aufgabe und dem verwendeten
+Embedding-Modell abhängt und daher nicht allgemein festgelegt werden kann
+~\cite{bhat2025rethinkingchunksizelongdocument}. Die für dieses Projekt verwendete Fenstergröße wurde
+daher als geeigneter Kompromiss für den verwendeten Wikipedia-Korpus und das nachfolgende Retrieval
+festgelegt.
+
+Die Überlappung soll verhindern, dass zusammengehörige Informationen durch eine Chunk-Grenze vollständig
+voneinander getrennt werden. Zusätzlich enthält jeder Chunk Metadaten, insbesondere den Titel des
+zugehörigen Wikipedia-Abschnitts. Diese werden im weiteren Verlauf der Pipeline verwendet, um die Herkunft
+der abgerufenen Textpassagen im Prompt kenntlich zu machen und eine Quellenattribution zu ermöglichen.
+
 
 \section{Embedding-Modell}
-% sentence-transformers/all-MiniLM-L6-v2, Dimension 384, warum dieses Modell
-% (Groesse/Qualitaets-Tradeoff fuer eingeschraenkte Hardware).
+
+Als Embedding-Modell kommt \texttt{sentence-transformers/all-MiniLM-L6-v2} zum Einsatz, welches jeden
+Chunk-Text auf einen 384-dimensionalen dichten Vektor abbildet~\cite{minilm-model-card}. Mit 22,7 Millionen
+Parametern ist es deutlich kleiner als vergleichbare Modelle wie \texttt{all-mpnet-base-v2}. Die offizielle
+Dokumentation der \texttt{sentence-transformers}-Bibliothek beschreibt \texttt{all-MiniLM-L6-v2} als
+schnellere Alternative zu \texttt{all-mpnet-base-v2}, während letzteres eine höhere Qualität bei entsprechend
+höherem Rechenaufwand bietet~\cite{sbert-pretrained-models}.
+
+Für das Projekt ist insbesondere der geringere Rechenaufwand relevant, da sowohl das initiale Embedding der
+ausgewählten Chunks während der Indexierung als auch das Embedding eingehender Anfragen auf der vorgesehenen
+CPU-only-Hardware ausgeführt werden muss. \texttt{all-MiniLM-L6-v2} stellt hierfür einen geeigneten
+Kompromiss zwischen Modellgröße und Embedding-Qualität dar.
+
+Das Modell wurde auf über 1,17~Milliarden Satzpaaren aus unterschiedlichen Quellen trainiert und ist unter
+anderem für Information-Retrieval-, Clustering- und Sentence-Similarity-Aufgaben vorgesehen
+~\cite{minilm-model-card}. Damit ist es für den im Projekt verfolgten Anwendungsfall des semantischen
+Retrievals geeignet.
+
+Eine weitere relevante Einschränkung des Modells ist die maximale Eingabelänge von 256 Word Pieces
+~\cite{minilm-model-card}. Da die Chunk-Größe anhand von Wörtern festgelegt wird, kann daraus jedoch nicht
+direkt abgeleitet werden, dass jeder Chunk diese Grenze unterschreitet, da ein Wort in mehrere Word Pieces
+zerlegt werden kann. Die tatsächliche Eingabelänge wird daher durch das verwendete Tokenisierungsverfahren
+begrenzt.
+
+Für die Indexierung und die spätere Abfrage wird dasselbe Embedding-Modell mit identischen Einstellungen
+verwendet. Sowohl \texttt{embed\_chunks()} als auch \texttt{embed\_query()} greifen auf dieselbe
+\texttt{Embedder}-Instanz mit aktivierter L2-Normalisierung
+(\texttt{normalize\_embeddings=True}) zurück. Dadurch werden Query- und Chunk-Vektoren im selben Vektorraum
+repräsentiert. Bei L2-normalisierten Vektoren entspricht das Skalarprodukt der Kosinus-Ähnlichkeit, wodurch
+die Berechnung direkt mit dem im OpenSearch-Index verwendeten \texttt{cosinesimil}-Ähnlichkeitsmaß
+übereinstimmt (Abschnitt~\ref{sec:opensearch-index-design}).
+
+\todo{Falls verfügbar: konkrete Latenzmessung für das Embedding auf dem Pi (Chunks/Sekunde bzw. ms pro Query)
+ergänzen. Dies würde die praktische Eignung des gewählten Modells für die Zielhardware zusätzlich belegen.}
+
 
 \section{OpenSearch-Index-Design}
+\label{sec:opensearch-index-design}
 % k-NN-Mapping (HNSW, nmslib-Engine, cosinesimil), warum HNSW statt exaktem
 % k-NN. Ggf. Parameter-Tuning-Ergebnisse (ef\_construction, m).
 
