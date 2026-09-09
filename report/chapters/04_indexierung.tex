@@ -70,6 +70,13 @@ die Berechnung direkt mit dem im OpenSearch-Index verwendeten \texttt{cosinesimi
 \todo{Falls verfügbar: konkrete Latenzmessung für das Embedding auf dem Pi (Chunks/Sekunde bzw. ms pro Query)
 ergänzen. Dies würde die praktische Eignung des gewählten Modells für die Zielhardware zusätzlich belegen.}
 
+Zur Bewertung der praktischen Ausführbarkeit auf der Zielhardware wurde das
+Embedding-Modell auf dem Raspberry Pi isoliert von OpenSearch und sonstigen
+I/O-Operationen vermessen. Für 1.000 synthetische Chunks mit jeweils ungefähr
+250 Wörtern benötigte das Modell 87,04~s, was einem Durchsatz von
+11,5~Chunks/s entspricht. Das Embedding einer einzelnen Suchanfrage benötigte
+bei 30 Wiederholungen nach einem Warm-up durchschnittlich 31,7~ms pro Query.
+
 
 \section{OpenSearch-Index-Design}
 \label{sec:opensearch-index-design}
