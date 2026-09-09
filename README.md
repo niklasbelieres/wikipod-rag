@@ -66,6 +66,59 @@ Local LLM with retrieved context
     ▼
 Answer
 ```
+## Setup
+
+Create a virtual environment and install the project with its development dependencies:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+WikiPod requires a local Wikipedia `.zim` file. ZIM files are not included in
+the repository and must be provided separately. Set `source.zim_file` in the
+appropriate configuration file under `config/` to the path of your local ZIM
+file.
+
+Start OpenSearch with Docker Compose:
+
+```bash
+docker compose up -d
+```
+
+Verify that OpenSearch is running:
+
+```bash
+curl http://localhost:9200
+```
+
+Runtime-specific configuration can be selected through `WIKIPOD_ENV`. Once the
+configured ZIM file is available and OpenSearch is running, indexing can be
+started with:
+
+```bash
+WIKIPOD_ENV=dev python -m wikipod.cli index
+```
+
+Configuration overrides for development, evaluation, Raspberry Pi tests, and production are stored in `config/`.
+
+## Testing
+
+Run the automated test suite and lint checks with:
+
+```bash
+pytest
+ruff check .
+```
+
+The same checks are executed by GitHub Actions for pushes and pull requests to `main`.
+
+## Status
+
+The core WikiPod pipeline is implemented: ZIM analysis and metadata extraction, budget-based document selection, chunking and embedding generation, OpenSearch indexing and dense retrieval, local RAG generation, retrieval evaluation, and Raspberry Pi runtime monitoring.
+
+The project is currently focused on evaluation, deployment measurements, and final documentation.
 
 ## Evaluation
 
