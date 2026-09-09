@@ -7,8 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from wikipod.analysis.metadata import extract_metadata
-from wikipod.analysis.reader import iter_articles
+from wikipod.analysis.reader import stream_articles_metadata_cached
 from wikipod.analysis.statistics import link_frequency_map
 from wikipod.config import get_config
 from wikipod.selection.pageviews import get_views, load_pageviews
@@ -72,13 +71,20 @@ def main() -> None:
     config = get_config()
 
     zim_path = config.resolve_path(config.paths.zim_file)
+    cache_path = (
+        config.resolve_path(config.paths.data_dir) / f"{zim_path.stem}_metadata_cache.jsonl"
+    )
 
     print(f"Reading articles from {zim_path}")
 
-    articles = [
-        extract_metadata(article)
-        for article in iter_articles(zim_path)
-    ]
+    # Same parallel + on-disk-cache path as `measure_corpus_size.py` and
+    # `wikipod index` pass 1 (include_sections=False -- only word_count/
+    # link_count/links/title are needed here, not full section text). Reuses
+    # the cache if one of those already built it for this ZIM, and builds it
+    # here otherwise so a later `wikipod index` run gets a free cache hit.
+    articles = list(
+        stream_articles_metadata_cached(zim_path, cache_path, include_sections=False)
+    )
 
     print(f"Loaded {len(articles)} articles")
 

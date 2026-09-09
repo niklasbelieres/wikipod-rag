@@ -21,6 +21,13 @@ def _values(rows: list[dict[str, str]], key: str) -> list[float]:
     return [float(row[key]) for row in rows]
 
 
+def _optional_values(rows: list[dict[str, str]], key: str) -> list[float]:
+    """Like `_values`, but for Pi-only columns (cpu_temp_c, throttled) that
+    are empty strings on non-Pi hardware (e.g. the build server) -- skips
+    rows where the value is missing instead of raising."""
+    return [float(row[key]) for row in rows if row.get(key)]
+
+
 def _elapsed_minutes(rows: list[dict[str, str]]) -> list[float]:
     """Return elapsed minutes since the first sample."""
     timestamps = [datetime.fromisoformat(row["timestamp"]) for row in rows]
@@ -81,7 +88,7 @@ def analyze(csv_path: Path, output_dir: Path) -> None:
     opensearch_rss = _values(rows, "opensearch_rss_mb")
     swap_used = _values(rows, "swap_used_mb")
     cpu = _values(rows, "cpu_pct_approx")
-    temperature = _values(rows, "cpu_temp_c")
+    temperature = _optional_values(rows, "cpu_temp_c")
 
     duration_minutes = elapsed[-1]
 
@@ -94,7 +101,10 @@ def analyze(csv_path: Path, output_dir: Path) -> None:
     print(f"Peak OpenSearch RSS: {max(opensearch_rss):.1f} MB")
     print(f"Peak swap used: {max(swap_used):.1f} MB")
     print(f"Peak CPU: {max(cpu):.1f} %")
-    print(f"Peak temperature: {max(temperature):.1f} °C")
+    if temperature:
+        print(f"Peak temperature: {max(temperature):.1f} °C")
+    else:
+        print("Peak temperature: n/a (no cpu_temp_c samples -- not running on a Pi)")
 
     _save_plot(
         elapsed,
@@ -125,13 +135,14 @@ def analyze(csv_path: Path, output_dir: Path) -> None:
         output_dir / "swap.png",
     )
 
-    _save_plot(
-        elapsed,
-        [(temperature, "CPU temperature")],
-        "Temperature (°C)",
-        "CPU temperature",
-        output_dir / "temperature.png",
-    )
+    if temperature:
+        _save_plot(
+            elapsed[: len(temperature)],
+            [(temperature, "CPU temperature")],
+            "Temperature (°C)",
+            "CPU temperature",
+            output_dir / "temperature.png",
+        )
 
     print(f"Plots written to: {output_dir}")
 
