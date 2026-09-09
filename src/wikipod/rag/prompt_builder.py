@@ -19,10 +19,31 @@ from wikipod.chunking.models import Chunk
 SYSTEM_PROMPT = (
     "You are an assistant answering questions using only the Wikipedia excerpts "
     "given below as context. Answer using only information contained in the "
-    "excerpts. If the excerpts do not contain enough information to answer, say "
-    "so explicitly instead of guessing. Keep answers concise, and refer to "
-    "excerpts by their [n] number when useful."
+    "excerpts. Every factual claim in your answer must be supported by a citation "
+    "to the relevant excerpt using its [n] number. Do not cite an excerpt that "
+    "does not support the claim. If the excerpts do not contain enough information "
+    "to answer the question, say so explicitly instead of guessing. Keep answers "
+    "concise."
 )
+
+FEW_SHOT_MESSAGES = [
+    {
+        "role": "user",
+        "content": (
+            "Context:\n"
+            "[1] (Example - Lead) The example subject was founded in 1900.\n"
+            "[2] (Example - History) It moved to London in 1920.\n\n"
+            "Question: When was the example subject founded and where did it later move?"
+        ),
+    },
+    {
+        "role": "assistant",
+        "content": (
+            "The example subject was founded in 1900 [1] and later moved "
+            "to London in 1920 [2]."
+        ),
+    },
+]
 
 # Word-count proxy for the model's context budget. sentence-transformers/GGUF
 # tokenizers run roughly ~1.3 tokens/word for English, so this leaves headroom
@@ -85,6 +106,7 @@ def build_messages(
 
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
+        *FEW_SHOT_MESSAGES,
         {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"},
     ]
     

@@ -25,6 +25,7 @@ def select_within_budget(
     weights: SelectionWeights,
     storage_budget_mb: float,
     pageviews: dict[str, int] | None = None,
+    excluded_categories: list[str] | None = None,
 ) -> SelectionResult:
     """Greedily select articles by score-per-byte until `storage_budget_mb` is exhausted.
 
@@ -42,6 +43,11 @@ def select_within_budget(
     total_candidates = 0
     for article in articles:
         total_candidates += 1
+        if excluded_categories and any(
+            category in excluded_categories for category in article.categories
+        ):
+            continue
+
         score = score_article(article, link_frequencies, weights, pageviews) / max(
             article.html_size_bytes, 1
         )

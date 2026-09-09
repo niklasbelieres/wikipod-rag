@@ -8,12 +8,13 @@ paths:
 
 selection:
   storage_budget_mb: 500
+  excluded_categories: []
   weights:
     word_count: 0.2
     link_count: 0.2
     importance: 0.2
     incoming_links: 0.4
-    pageviews: 0.0 # set > 0 once a pageviews file is configured
+    pageviews: 0.0 # set > 0 once a pageviews file is configured 
 
 chunking:
   max_words: 250

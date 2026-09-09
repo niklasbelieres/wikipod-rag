@@ -156,6 +156,7 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
             config.selection.weights,
             config.selection.storage_budget_mb,
             pageviews=pageviews,
+            excluded_categories=config.selection.excluded_categories,
         )
     console.print(
         f"Selected {len(result.selected)}/{result.total_candidates} articles "

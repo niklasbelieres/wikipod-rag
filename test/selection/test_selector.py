@@ -3,7 +3,7 @@ from wikipod.config import SelectionWeights
 from wikipod.selection.selector import select_top_n, select_within_budget
 
 
-def _article(article_id, size_bytes, word_count=100, title=None):
+def _article(article_id, size_bytes, word_count=100, title=None, categories=None):
     return ArticleMetadata(
         article_id=article_id,
         title=title or f"Article {article_id}",
@@ -13,7 +13,7 @@ def _article(article_id, size_bytes, word_count=100, title=None):
         links=[],
         section_count=0,
         sections=[],
-        categories=[],
+        categories=categories or [],
     )
 
 
@@ -54,6 +54,35 @@ def test_select_within_budget_reports_candidate_count():
     assert result.total_candidates == 10
 
 
+def test_select_within_budget_excludes_configured_categories():
+    included = _article(1, size_bytes=100, title="Included", categories=["Science"])
+    excluded = _article(2, size_bytes=100, title="Excluded", categories=["Politics"])
+
+    result = select_within_budget(
+        [included, excluded],
+        link_frequencies={},
+        weights=SelectionWeights(),
+        storage_budget_mb=100,
+        excluded_categories=["Politics"],
+    )
+
+    assert [article.title for article in result.selected] == ["Included"]
+
+
+def test_select_within_budget_without_exclusions_keeps_existing_behavior():
+    first = _article(1, size_bytes=100, title="First", categories=["Politics"])
+    second = _article(2, size_bytes=100, title="Second", categories=["Science"])
+
+    result = select_within_budget(
+        [first, second],
+        link_frequencies={},
+        weights=SelectionWeights(),
+        storage_budget_mb=100,
+    )
+
+    assert {article.title for article in result.selected} == {"First", "Second"}
+
+    
 def test_select_top_n_respects_the_limit():
     articles = [_article(i, size_bytes=100) for i in range(10)]
     selected = select_top_n(articles, link_frequencies={}, weights=SelectionWeights(), n=3)

@@ -39,6 +39,7 @@ class SelectionWeights(BaseModel):
 
 class SelectionConfig(BaseModel):
     storage_budget_mb: float
+    excluded_categories: list[str] = []
     weights: SelectionWeights = SelectionWeights()
 
 

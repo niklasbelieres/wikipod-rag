@@ -101,6 +101,18 @@ started with:
 WIKIPOD_ENV=dev python -m wikipod.cli index
 ```
 
+After the index has been built, a query can be executed with:
+
+```bash
+WIKIPOD_ENV=dev python -m wikipod.cli query "What is the Catholic Church?"
+```
+
+To inspect only the retrieved chunks without running the local language model:
+
+```bash
+WIKIPOD_ENV=dev python -m wikipod.cli query --chunks-only "What is the Catholic Church?"
+```
+
 Configuration overrides for development, evaluation, Raspberry Pi tests, and production are stored in `config/`.
 
 ## Testing
