@@ -11,7 +11,49 @@ Scoring- beziehungsweise Selection-Algorithmus zum Einsatz kommt. Dieser löst d
 Problem in zwei Teilen: zunächst wird für jeden Artikel ein Score berechnet, darauf 
 aufbauend erfolgt eine budgetbeschränkte Auswahl.
 
+Da Speicherkapazität in der Regel nur begrenzt verfügbar ist und eine Kopie der 
+gesamten englischsprachigen Wikipedia einen Speicherbedarf von über 100~GB 
+darstellt~\cite{}, wird nur ein Teil der Artikel ausgewählt, der dem zuvor 
+konfigurierten Speicherbudget genügt. Dieses ist für den produktiven Indexierungslauf 
+in \texttt{config/server.yaml} unter \texttt{selection.storage\_budget\_mb} festgelegt 
+(aktuell 13.000~MB), sodass der 
+Scoring- beziehungsweise Selection-Algorithmus zum Einsatz kommt. Dieser löst das 
+Problem in zwei Teilen: zunächst wird für jeden Artikel ein Score berechnet, darauf 
+aufbauend erfolgt eine budgetbeschränkte Auswahl.
+
 \section{Metadatenextraktion}
+
+Um aus den Wikipedia-Artikeln, welche in Form von HTML-Dokumenten innerhalb
+einer ZIM-Datei vorliegen, Metadaten extrahieren zu können, müssen diese
+Dokumente zunächst vorverarbeitet beziehungsweise normalisiert und bereinigt
+werden.
+
+Hierzu existiert innerhalb der Pipeline das Modul \texttt{Analysis}, welches
+genau diese Aufgabe übernimmt. Resultierend werden artikelweise folgende
+Metadaten extrahiert:
+
+\begin{itemize}
+    \item Titel
+    \item Byte-Größe des Dokuments
+    \item Anzahl der Wörter
+    \item Anzahl der ausgehenden Links
+    \item Liste der ausgehenden Links
+    \item Anzahl der Kapitel
+    \item Titel der Kapitel
+    \item Summe der Aufrufe über 24 Stunden
+\end{itemize}
+
+Die Aufrufszahlen der einzelnen Artikel erhalten wir durch die Aggregation von, durch Wikimedia (QUELLE) bereitgestellten, Pageview-Dumps, welche
+über einen Zeitraum eines vorher konfigurierten Tages gesammelt und Anhand der Artikeltitel, welche im vorhinein normalisiert wurden, eindeutig
+zugeordnet werden können.
+Zusätzlich zu den oben aufgeführten Metadaten aggregieren wir die Anzahl der Aufrufe eines Artikels an einem vorher konfigurierten Tag mithilfe von Wikimedia-Pageview-Dumps, 
+welche mithilfe von vorher normalisierten Titeln mit den eigentlichen Artikeln verknüpft werden können.
+
+ÜBERLEITUNG:
+Die einzelnen Metadaten können anhand einer Konfigurationsdatei verschieden Gewichtet werden, um je nach Priorisierung unterschiedliche Ergebnisse im Scoring zu erzielen.
+
+\section{Link-Frequenz-Map und Zwei-Pass-Architektur}
+
 
 Um aus den Wikipedia-Artikeln, welche in Form von HTML-Dokumenten innerhalb
 einer ZIM-Datei vorliegen, Metadaten extrahieren zu können, müssen diese
@@ -56,25 +98,70 @@ innerhalb des Korpus (\texttt{incoming\_links}) sowie externe Aufrufzahlen (\tex
 Da diese Signale unterschiedliche Wertebereiche und Verteilungen aufweisen, insbesondere \texttt{importance} als 
 Summe über alle ausgehenden Links kann bei stark vernetzten Artikeln deutlich größere Werte annehmen als die übrigen Signale,
 wird jedes Signal vor der Gewichtung logarithmisch gedämpft ($\log(1+x)$). Dadurch wird verhindert, dasss einzelne Ausreißerwerte,
-etwa ein extrem häufig verlinkter Hub-Artikel, den Gesamtscore dominieren. Der Score eines Artikels $a$ berechnet sich
-damit als gewichtete Summe:
+etwa ein extrem häufig verlinkter Hub-Artikel, den Gesamtscore dominieren. Für vier der fünf Signale
+(\texttt{word\_count}, \texttt{link\_count}, \texttt{incoming\_links}, \texttt{pageviews}) ist dies je ein
+einzelner, gedämpfter Skalarwert; \texttt{importance} bildet dabei eine Ausnahme (siehe unten). Der Score eines
+Artikels $a$ berechnet sich insgesamt als gewichtete Summe:
 
 \[
 \mathrm{Score}(a)
-= \sum_{s \in S} w_s \cdot
+= \sum_{s \,\in\, S \setminus \{\mathrm{importance}\}} w_s \cdot
 \log\left(1 + \mathrm{value}_s(a)\right)
+\;+\; w_{\mathrm{importance}} \cdot \sum_{l \,\in\, \mathrm{links}(a)} \log\bigl(1 + \mathrm{freq}(l)\bigr)
 \]
 
-Wobei $S$ die fünf Signale und $w_s$ die zugehörigen, konfigurierbaren Gewichte bezeichnet.
+Wobei $S$ die fünf Signale, $w_s$ die zugehörigen, konfigurierbaren Gewichte, $\mathrm{links}(a)$ die Liste der
+ausgehenden Links von $a$ und $\mathrm{freq}(l)$ die korpusweite Häufigkeit des Linkziels $l$ aus der weiter
+unten beschriebenen Link-Häufigkeitsmap bezeichnet. \texttt{importance} nimmt damit strukturell eine
+Sonderstellung ein: Während die übrigen vier Signale je ein einzelner gedämpfter Skalarwert sind, ist
+\texttt{importance} eine Summe gedämpfter Terme über eine pro Artikel unterschiedliche Anzahl an Links --
+äquivalent zu $\log\!\left(\prod_{l \in \mathrm{links}(a)} (1+\mathrm{freq}(l))\right)$. Die logarithmische
+Dämpfung wirkt hier also pro Linkziel, nicht auf den resultierenden Artikelwert als Ganzes.
 
 Für die Berchnung von \texttt{importance} und \texttt{incoming\_links} wird vorab eine korpusweite
 Link-Häufigkeitsmap benötigt, die zählt, wie oft jeder Artikeltitel als Ziel eines Links vorkommt. Diese
 kann erst vollständig vorliegen, nachdem der gesamte Korpus einmal durchlaufen wurde. Das Scoring erfordert
 somit zwangsläufig zwei Durcläufe, bevor die eigentliche Auswahl beginnen kann (siehe \todo{Verweis auf K6 Streaming-Architektur}).
 
-Die Gewichte $w_s$ siind nicht fest codiert, sondern über \texttt{config/prod.yaml} konfigurierbar (Tabelle~\ref{tab:scoring-weights}). 
+Die Gewichte $w_s$ siind nicht fest codiert, sondern über \texttt{config/prod.yaml} beziehungsweise für den
+produktiven Lauf über \texttt{config/server.yaml} konfigurierbar (Tabelle~\ref{tab:scoring-weights}).
 Somit ist die Priorisierung eine dokumentierte Design-Entscheidung.
-\todo{Tabelle mit echten gewichten und messwerten}
+
+Tabelle~\ref{tab:scoring-weights} zeigt die konfigurierten Gewichte zusammen mit den tatsächlich gemessenen
+Signalwerten über den vollen en.wikipedia-Korpus (7.322.195 Artikel). Für jedes Signal ist der Mittelwert des
+gedämpften Rohwerts ($\log(1+x)$), der daraus resultierende gewichtete Mittelwert sowie dessen Anteil am
+mittleren Gesamtscore aufgeführt.
+
+\begin{table}[ht]
+    \centering
+    \caption{Konfigurierte Gewichte und gemessene Beiträge der fünf Scoring-Signale (voller en.wikipedia-Korpus)}
+    \label{tab:scoring-weights}
+    \begin{tabular}{lrrrr}
+        \toprule
+        Signal & Gewicht $w_s$ & Mittelwert $\log(1{+}x)$ & Gewichteter Mittelwert & Anteil am Score \\
+        \midrule
+        \texttt{word\_count}     & 0,150 & 3,950  & 0,592 & 8,90\%  \\
+        \texttt{link\_count}     & 0,150 & 1,819  & 0,273 & 4,10\%  \\
+        \texttt{importance}      & 0,150 & 36,647 & 5,497 & 82,61\% \\
+        \texttt{incoming\_links} & 0,250 & 0,082  & 0,020 & 0,31\%  \\
+        \texttt{pageviews}       & 0,300 & 0,904  & 0,271 & 4,08\%  \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Auffällig ist, dass \texttt{importance} trotz eines mit 0,150 vergleichsweise niedrigen Gewichts mit 82,61\,\%
+den Score dominiert, während \texttt{incoming\_links} trotz des höchsten Gewichts (0,250) nur 0,31\,\% beiträgt.
+Ursache dafür ist die oben beschriebene strukturelle Sonderstellung von \texttt{importance}: Da die Dämpfung
+pro Linkziel und nicht auf den aggregierten Artikelwert wirkt, wächst \texttt{importance} tendenziell mit der
+Anzahl der ausgehenden Links eines Artikels -- ein Artikel mit vielen (auch nur mäßig populären) ausgehenden
+Links summiert entsprechend viele bereits gedämpfte Terme und erreicht dadurch einen deutlich größeren
+Rohwert als etwa \texttt{link\_count} desselben Artikels, das dieselbe Linkanzahl nur einmal dämpft. Die
+Rohwerte bleiben dadurch auch nach der Dämpfung stark rechtsschief (95.\,Perzentil 89,912, Maximum 51.226,971
+gegenüber einem Mittelwert von 36,647), während die übrigen Signale in einer deutlich engeren Größenordnung
+liegen. Die konfigurierten Gewichte spiegeln also nicht unmittelbar den tatsächlichen Einfluss der einzelnen
+Signale auf die resultierende Auswahl wider. Diese Diskrepanz zwischen beabsichtigter Gewichtung und
+tatsächlichem Verhalten wird in Kapitel~\ref{ch:diskussion} als mögliche Verbesserung für eine zukünftige
+Iteration der Scoring-Funktion aufgegriffen.
 
 
 
@@ -94,4 +181,7 @@ Lösung, ist aber als Standardansatz für Knapsack-Instanzen dieser Größe etab
 effizient berechenbar.
 
 Das Ergebnis der Auswahl umfasst neben der eigentlichen Artikelmenge auch Kennzahlen zur Budgetausschöpfung
-(\texttt{used\_mb}, \texttt{utilization}) — \todo{konkrete Werte aus dem Server-Lauf: Anzahl ausgewählter Artikel, tatsächlich genutztes Budget in }%}.
+(\texttt{used\_mb}, \texttt{utilization}). Im produktiven Lauf auf dem vollen en.wikipedia-Korpus wurden von
+7.322.195 Kandidatenartikeln 1.638.375 Artikel (22,4\,\%) ausgewählt. Dabei wurden 13.000,0 von 13.000~MB
+Speicherbudget genutzt, was einer Budgetausschöpfung (\texttt{utilization}) von 100\,\% entspricht -- die
+Greedy-Heuristik füllt das Budget damit praktisch vollständig aus.

@@ -11,7 +11,36 @@ relevante Textpassagen als Kontext für das Large-Language-Modell abgerufen werd
 Textpassagen als Retrieval-Einheiten stellt dabei einen etablierten Ansatz im Dense Retrieval dar
 ~\cite{karpukhin-etal-2020-dense}.
 
+Damit die im vorherigen Pipeline-Schritt ausgewählte Wikipedia-Teilmenge von einem Large-Language-Modell genutzt
+werden kann, müssen diese Artikel zunächst in geeignete Textabschnitte (Chunks) unterteilt werden, bevor diese
+als dichte Vektoren indexiert werden können. Die Aufteilung ermöglicht eine granularere Suche nach relevanten
+Informationen, da bei einer Anfrage nicht zwangsläufig ein vollständiger Wikipedia-Artikel, sondern gezielt
+relevante Textpassagen als Kontext für das Large-Language-Modell abgerufen werden können. Die Verwendung von
+Textpassagen als Retrieval-Einheiten stellt dabei einen etablierten Ansatz im Dense Retrieval dar
+~\cite{karpukhin-etal-2020-dense}.
+
 \section{Chunking-Strategie}
+\label{sec:chunking-strategie}
+
+Die Zerlegung der Wikipedia-Artikel erfolgt abschnittsweise. Hierzu iteriert die Methode
+\texttt{chunk\_article()} über die in \texttt{article.sections} enthaltenen Abschnitte. Dadurch wird
+sichergestellt, dass ein Chunk ausschließlich Text aus einem einzelnen Wikipedia-Abschnitt enthält und
+der inhaltliche Zusammenhang der jeweiligen Passage erhalten bleibt.
+
+Innerhalb eines Abschnitts werden die Texte mit einer maximalen Fenstergröße von 250 Wörtern und einer
+Überlappung von 40 Wörtern unterteilt. Die Wahl der Chunk-Größe stellt einen Kompromiss zwischen der
+Granularität des Retrievals und dem Erhalt ausreichenden Kontextes dar. Untersuchungen zeigen, dass die
+optimale Chunk-Größe von der Charakteristik der Daten, der konkreten Retrieval-Aufgabe und dem verwendeten
+Embedding-Modell abhängt und daher nicht allgemein festgelegt werden kann
+~\cite{bhat2025rethinkingchunksizelongdocument}. Die für dieses Projekt verwendete Fenstergröße wurde
+daher als geeigneter Kompromiss für den verwendeten Wikipedia-Korpus und das nachfolgende Retrieval
+festgelegt.
+
+Die Überlappung soll verhindern, dass zusammengehörige Informationen durch eine Chunk-Grenze vollständig
+voneinander getrennt werden. Zusätzlich enthält jeder Chunk Metadaten, insbesondere den Titel des
+zugehörigen Wikipedia-Abschnitts. Diese werden im weiteren Verlauf der Pipeline verwendet, um die Herkunft
+der abgerufenen Textpassagen im Prompt kenntlich zu machen und eine Quellenattribution zu ermöglichen.
+
 \label{sec:chunking-strategie}
 
 Die Zerlegung der Wikipedia-Artikel erfolgt abschnittsweise. Hierzu iteriert die Methode
@@ -67,18 +96,24 @@ repräsentiert. Bei L2-normalisierten Vektoren entspricht das Skalarprodukt der 
 die Berechnung direkt mit dem im OpenSearch-Index verwendeten \texttt{cosinesimil}-Ähnlichkeitsmaß
 übereinstimmt (Abschnitt~\ref{sec:opensearch-index-design}).
 
-\todo{Falls verfügbar: konkrete Latenzmessung für das Embedding auf dem Pi (Chunks/Sekunde bzw. ms pro Query)
-ergänzen. Dies würde die praktische Eignung des gewählten Modells für die Zielhardware zusätzlich belegen.}
+Zur Einschätzung des Rechenaufwands wurde die Embedding-Geschwindigkeit isoliert gemessen -- also ohne
+den Anteil von OpenSearch-Bulk-Writes oder ZIM-Zugriff, um ausschließlich die Kosten der Modellinferenz
+abzubilden. Unterschieden wurden zwei Fälle: der Massen-Durchsatz beim Indexieren (Batch-Embedding mit
+\texttt{embed\_chunks()}, Chunks von ca.\ 250 Wörtern Länge entsprechend der in
+Abschnitt~\ref{sec:chunking-strategie} festgelegten Fenstergröße) sowie die Latenz einer einzelnen
+Anfrage (\texttt{embed\_query()}, Batch-Größe 1, wie im Retrieval-Pfad zur Laufzeit).
 
-Zur Bewertung der praktischen Ausführbarkeit auf der Zielhardware wurde das
-Embedding-Modell auf dem Raspberry Pi isoliert von OpenSearch und sonstigen
-I/O-Operationen vermessen. Für 1.000 synthetische Chunks mit jeweils ungefähr
-250 Wörtern benötigte das Modell 87,04~s, was einem Durchsatz von
-11,5~Chunks/s entspricht. Das Embedding einer einzelnen Suchanfrage benötigte
-bei 30 Wiederholungen nach einem Warm-up durchschnittlich 31,7~ms pro Query.
+Die Messung erfolgte auf dem für die Indexierung des vollen Korpus verwendeten Build-Server (104~Kerne),
+nicht auf dem Raspberry Pi selbst -- die Zahlen belegen daher die grundsätzliche Eignung des Modells,
+nicht die konkrete Laufzeit auf der Zielhardware. Beim Batch-Embedding wurden 655,0~Chunks pro Sekunde
+erreicht, bei einzelnen Anfragen betrug die mittlere Latenz 5,4~ms pro Query. Insbesondere die
+Query-Latenz liegt damit deutlich unterhalb der in Kapitel~\ref{ch:evaluation} gemessenen
+Gesamt-Retrieval-Latenz, sodass das Embedding selbst auf dieser Hardware keinen dominanten Anteil an der
+Anfragebearbeitung ausmacht. Eine entsprechende Messung direkt auf dem Raspberry Pi steht noch aus.
 
 
 \section{OpenSearch-Index-Design}
+\label{sec:opensearch-index-design}
 \label{sec:opensearch-index-design}
 % k-NN-Mapping (HNSW, nmslib-Engine, cosinesimil), warum HNSW statt exaktem
 % k-NN. Ggf. Parameter-Tuning-Ergebnisse (ef\_construction, m).

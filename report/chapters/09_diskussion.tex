@@ -14,6 +14,25 @@
 % Streaming-Architektur setzen statt erst bei vollem Korpus zu merken,
 % dass In-Memory-Ansaetze nicht skalieren).
 
+Ein konkreter Punkt, den wir im Rückblick anders angehen würden, betrifft die Gewichtung des Scoring-Modells
+aus Abschnitt~\ref{ch:dokumentenauswahl}. Die Messung auf dem vollen en.wikipedia-Korpus (Tabelle~\ref{tab:scoring-weights})
+zeigt, dass \texttt{importance} trotz eines mit 0,150 vergleichsweise niedrigen Gewichts 82,61\,\% des
+gewichteten Gesamtscores ausmacht, während \texttt{incoming\_links} trotz des höchsten Gewichts (0,250) nur
+0,31\,\% beiträgt. Ursächlich ist, dass die logarithmische Dämpfung bei \texttt{importance} pro ausgehendem
+Link und nicht auf den aggregierten Artikelwert angewendet wird -- der Rohwert wächst dadurch tendenziell mit
+der Anzahl der ausgehenden Links und bleibt strukturell größer als bei den übrigen, einfach gedämpften
+Signalen. Die konfigurierten Gewichte spiegeln damit nicht den tatsächlichen Einfluss der Signale auf die
+Auswahl wider, obwohl genau das mit \texttt{config/prod.yaml} beziehungsweise \texttt{config/server.yaml}
+beabsichtigt war.
+
+Für eine zukünftige Iteration wären zwei Ansätze naheliegend: entweder \texttt{importance} durch die Anzahl
+der berücksichtigten Links zu normalisieren (Mittelwert statt Summe der gedämpften Linkfrequenzen), oder alle
+fünf Rohsignale vor der Gewichtung zusätzlich zu standardisieren (z.\,B. per Z-Score relativ zu ihrer eigenen
+Verteilung im Korpus), sodass ein konfiguriertes Gewicht tatsächlich einen vergleichbaren Anteil am Endscore
+bewirkt -- unabhängig von der ursprünglichen Skala des jeweiligen Signals. Beide Änderungen hätten jedoch
+Rückwirkungen auf die bereits durchgeführten Selektionsläufe und wurden im Rahmen dieses Projekts aus
+Zeitgründen nicht mehr umgesetzt.
+
 \section{Grenzen der Loesung}
 % Was deckt das System bewusst nicht ab (z. B. nur englische Wikipedia,
 % keine Multi-Turn-Konversation, Kategorien-Signal nicht genutzt, ...).
