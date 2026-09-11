@@ -7,11 +7,84 @@
 % + dichte Vektorindexierung + RAG auf einem Raspberry Pi 5 (16 GB RAM, 1 TB SSD).
 
 \section{Motivation und Problemstellung}
-% ...
+
+Wikipedia stellt einen umfangreichen Wissensbestand bereit, dessen Nutzung
+üblicherweise eine funktionierende Internetverbindung voraussetzt. In
+Situationen, in denen kein direkter Internetzugang verfügbar ist, beispielsweise
+aufgrund technischer Störungen oder fehlender Netzanbindung, ist der Zugriff auf
+diesen Wissensbestand daher nur eingeschränkt möglich. Ziel des Projekts WikiPod
+ist es, zu untersuchen, inwieweit ein Teil der englischsprachigen Wikipedia
+lokal bereitgestellt und ohne direkte Internetverbindung nutzbar gemacht werden
+kann.
+
+Eine zentrale Randbedingung stellt dabei die vorgesehene Zielhardware dar. Das
+System soll auf einem Raspberry Pi~5 mit 16~GB Arbeitsspeicher und einer
+1-TB-SSD betrieben werden. Aufgrund dieser begrenzten Ressourcen kann nicht
+davon ausgegangen werden, dass sämtliche Daten und Verarbeitungsschritte ohne
+weitere Einschränkungen auf die Zielhardware übertragen werden können. Es muss
+daher zunächst eine geeignete Teilmenge der englischsprachigen Wikipedia
+ausgewählt werden, die ein vorgegebenes Speicherbudget einhält.
+
+Neben der lokalen Bereitstellung soll der ausgewählte Wissensbestand auch für
+natürlichsprachliche Anfragen nutzbar sein. Hierzu werden die ausgewählten
+Wikipedia-Inhalte als dichte Vektoren in OpenSearch indexiert und relevante
+Textpassagen zu einer Anfrage abgerufen. Diese bilden anschließend den Kontext
+für ein lokal betriebenes Sprachmodell im Rahmen eines
+Retrieval-Augmented-Generation-Ansatzes. Neben der funktionalen Umsetzung stellt
+sich damit insbesondere die Frage, wie effektiv das Retrieval arbeitet und
+inwieweit sich die Verarbeitung unter den gegebenen Hardwarebeschränkungen
+praktikabel durchführen lässt.
 
 \section{Ziele der Projektarbeit}
-% Die 5 Fragestellungen aus der Aufgabenstellung kurz auflisten -- dient als
-% roter Faden fuer die Kapitelstruktur (Kap. 3-7 bilden diese 5 Punkte ab).
+
+Ausgehend von dieser Problemstellung verfolgt die Projektarbeit fünf zentrale
+Ziele. Zunächst soll eine lokale Kopie ausgewählter Inhalte der
+englischsprachigen Wikipedia bereitgestellt werden. Da die verfügbare
+Speicherkapazität begrenzt ist, soll hierfür ein Verfahren entwickelt werden,
+das eine geeignete Teilmenge der Wikipedia unter Einhaltung eines vorgegebenen
+Speicherbudgets auswählt.
+
+Die ausgewählten Inhalte sollen anschließend als dichte Vektoren in OpenSearch
+indexiert werden, sodass zu einer natürlichsprachlichen Anfrage relevante
+Textpassagen semantisch abgerufen werden können. Auf dieser Grundlage soll ein
+für die eingeschränkte Zielhardware geeignetes Sprachmodell ausgewählt und mit
+den abgerufenen Textpassagen zur lokalen Antwortgenerierung eingesetzt werden.
+
+Abschließend soll die entwickelte Lösung sowohl hinsichtlich ihrer Effektivität
+als auch ihrer Effizienz evaluiert werden. Dabei werden insbesondere die
+Qualität des Retrievals sowie Laufzeit und Ressourcenbedarf auf der
+vorgesehenen Hardware betrachtet. Die Projektarbeit untersucht damit die
+folgenden fünf Schwerpunkte:
+
+\begin{enumerate}
+    \item Bereitstellung einer lokalen Kopie der englischsprachigen Wikipedia,
+    \item Auswahl einer Teilmenge unter Berücksichtigung eines Speicherbudgets,
+    \item Indexierung der ausgewählten Inhalte als dichte Vektoren mit OpenSearch,
+    \item Auswahl und Einsatz eines für die Zielhardware geeigneten Sprachmodells,
+    \item Evaluation der Gesamtlösung hinsichtlich Effektivität und Effizienz.
+\end{enumerate}
 
 \section{Aufbau des Berichts}
-% Kurzer Ueberblick, welches Kapitel was behandelt.
+
+Der weitere Bericht folgt den wesentlichen Verarbeitungsschritten und
+Fragestellungen des Projekts. Kapitel~\ref{ch:architektur} gibt zunächst einen
+Überblick über die Systemarchitektur, die eingesetzten Technologien und den
+Aufbau der Verarbeitungspipeline.
+
+Anschließend beschreibt Kapitel~\ref{ch:dokumentenauswahl} die Auswahl einer
+Teilmenge der Wikipedia unter Berücksichtigung des verfügbaren Speicherbudgets.
+Kapitel~\ref{ch:indexierung} behandelt die Aufbereitung der ausgewählten
+Artikel, ihre Einbettung als dichte Vektoren sowie die Indexierung und das
+Retrieval mit OpenSearch. Darauf aufbauend wird die lokale Antwortgenerierung
+mithilfe eines Sprachmodells im Rahmen des RAG-Ansatzes erläutert.
+
+Die Umsetzung unter den Ressourcenbeschränkungen des Raspberry Pi sowie die
+dabei auftretenden technischen Herausforderungen werden anschließend im
+Deployment-Kapitel betrachtet. Die Evaluation untersucht die entwickelte
+Lösung hinsichtlich Retrieval-Qualität, Laufzeit und Ressourcenbedarf. Eine
+Anleitung zur Inbetriebnahme fasst die für die Nutzung und Reproduktion
+notwendigen Schritte zusammen.
+
+Abschließend werden die getroffenen Designentscheidungen und die Grenzen der
+Lösung diskutiert. Das Fazit fasst die Ergebnisse der Projektarbeit zusammen
+und zeigt mögliche Ansatzpunkte für zukünftige Weiterentwicklungen auf.

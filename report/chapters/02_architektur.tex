@@ -1,24 +1,236 @@
 \chapter{Systemarchitektur}
 \label{ch:architektur}
 
-% Gesamtueberblick, bevor in Kap. 3-7 jede Phase einzeln vertieft wird.
-% Ein Architektur-Diagramm (Pipeline: ZIM -> Selection -> Chunking ->
-% Embedding -> OpenSearch -> Retrieval -> Generation) gehoert hier rein.
-
 \section{Technologie-Stack}
-% KIWIX/ZIM, libzim, BeautifulSoup, sentence-transformers, OpenSearch (k-NN/HNSW),
-% Ollama/llama.cpp, Click/Rich fuer die CLI -- kurz je Technologie, warum diese
-% Wahl (Bezug zur Aufgabenstellung: KIWIX und OpenSearch waren vorgegeben).
+
+Die Umsetzung von WikiPod basiert auf mehreren Komponenten, die jeweils eine klar
+abgegrenzte Aufgabe innerhalb der Gesamtarchitektur übernehmen. Für die lokale
+Bereitstellung der Wikipedia-Inhalte werden ZIM-Dateien im KIWIX-Format verwendet.
+Der Zugriff auf diese Dateien erfolgt in Python über \texttt{libzim}. Die in den
+Artikeln enthaltenen HTML-Dokumente werden mit \texttt{BeautifulSoup} verarbeitet,
+um Textinhalte und Metadaten zu extrahieren.
+
+Für die semantische Repräsentation der Textabschnitte kommt die Bibliothek
+\texttt{sentence-transformers} zum Einsatz. Die erzeugten dichten Vektoren werden
+gemeinsam mit den zugehörigen Metadaten in OpenSearch gespeichert und dort für
+das k-NN-basierte Retrieval verwendet. Die Auswahl von KIWIX beziehungsweise ZIM
+als Datenformat und OpenSearch als Retrieval-System ergibt sich unmittelbar aus
+der Aufgabenstellung des Projekts.
+
+Die lokale Antwortgenerierung wird über ein kleines Sprachmodell realisiert.
+Dafür unterstützt die Implementierung ein direkt eingebundenes
+\texttt{llama.cpp}-Backend; für die lokale Entwicklung kann alternativ Ollama
+verwendet werden. Die Kommandozeilenschnittstelle des Projekts ist mit
+\texttt{Click} umgesetzt und nutzt \texttt{Rich} für strukturierte
+Terminalausgaben. Konfigurationen werden mit \texttt{PyYAML} eingelesen und über
+\texttt{Pydantic}-Modelle validiert.
 
 \section{Pipeline-Ueberblick}
-% \begin{figure}[H]
-%     \centering
-%     \includegraphics[width=\textwidth]{architektur_diagramm.pdf}
-%     \caption{Ueberblick ueber die WikiPod-Pipeline}
-%     \label{fig:pipeline}
-% \end{figure}
+
+Die Systemarchitektur von WikiPod lässt sich in zwei voneinander getrennte
+Phasen unterteilen: die Indexierungsphase und die Anfragephase.
+Abbildung~\ref{fig:pipeline} zeigt den vollständigen Datenfluss von der
+Wikipedia-ZIM-Datei bis zur generierten Antwort. Die Trennung ist insbesondere
+für den Einsatz auf ressourcenbeschränkter Hardware relevant, da die
+rechenintensive Aufbereitung des Datenbestands unabhängig von der späteren
+Beantwortung einzelner Nutzeranfragen durchgeführt werden kann.
+
+In der Indexierungsphase bildet eine lokale Wikipedia-ZIM-Datei die
+Datengrundlage. Zunächst werden die für die Dokumentenauswahl benötigten
+Metadaten extrahiert und in einem JSONL-Cache zwischengespeichert. Auf dieser
+Grundlage werden die Link-Frequenzen bestimmt, die Artikel bewertet und unter
+Berücksichtigung des verfügbaren Speicherbudgets ausgewählt. Erst für die
+ausgewählten Artikel wird anschließend der vollständige Text geladen. Dieser
+wird in überlappende Textabschnitte zerlegt und durch ein Embedding-Modell in
+dichte Vektorrepräsentationen überführt. Die resultierenden Chunks werden
+zusammen mit ihren Embeddings und Metadaten im OpenSearch-Index gespeichert.
+
+Die Anfragephase greift auf diesen vorbereiteten Index zurück. Eine
+Nutzeranfrage wird zunächst mit demselben Embedding-Modell wie die
+Dokument-Chunks in einen Vektor überführt. Über eine Ähnlichkeitssuche in
+OpenSearch werden anschließend die zur Anfrage passendsten Textabschnitte
+ermittelt. Diese bilden gemeinsam mit der ursprünglichen Anfrage und den
+Anweisungen an das Sprachmodell den Prompt. Das lokal ausgeführte Sprachmodell
+erzeugt daraus schließlich die Antwort. Dadurch bleiben sowohl der
+Wikipedia-Datenbestand als auch Retrieval und Antwortgenerierung innerhalb der
+lokalen Systemumgebung.
+
+\begin{figure}[H]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tikzpicture}[
+        node distance=7mm,
+        phase/.style={
+            draw,
+            rounded corners=3mm,
+            inner sep=8mm
+        },
+        box/.style={
+            draw,
+            rounded corners=2mm,
+            align=center,
+            text width=5.2cm,
+            minimum height=10mm
+        },
+        store/.style={
+            draw,
+            cylinder,
+            shape border rotate=90,
+            aspect=0.28,
+            align=center,
+            text width=2.6cm,
+            minimum height=2.8cm
+        },
+        arrow/.style={
+            -{Latex[length=2.2mm]},
+            thick
+        }
+    ]
+
+    % Indexierungsphase
+    \node[box] (zim)
+        {Wikipedia-ZIM\\{\small Dump der Artikeldaten}};
+
+    \node[box, below=of zim] (metadata)
+        {Metadatenextraktion\\und JSONL-Cache};
+
+    \node[box, below=of metadata] (selection)
+        {Link-Frequenz-Map,\\Scoring und Auswahl};
+
+    \node[box, below=of selection] (fulltext)
+        {Volltext der ausgewählten\\Artikel laden};
+
+    \node[box, below=of fulltext] (chunking)
+        {Chunking\\{\small Text in überlappende Abschnitte}};
+
+    \node[box, below=of chunking] (embedding)
+        {Embedding der Chunks\\{\small Vektorrepräsentationen}};
+
+    % Anfragephase
+    \node[box, right=8.2cm of zim] (query)
+        {Nutzeranfrage\\{\small natürliche Sprache}};
+
+    \node[box, below=of query] (queryembed)
+        {Query-Embedding\\{\small Vektorrepräsentation}};
+
+    \node[box, below=of queryembed] (retrieval)
+        {Dense Retrieval in OpenSearch\\
+        {\small ähnliche Chunks suchen}};
+
+    \node[box, below=of retrieval] (prompt)
+        {Prompt-Konstruktion\\
+        {\small relevante Chunks + Anweisung}};
+
+    \node[box, below=of prompt] (llm)
+        {Lokales Sprachmodell};
+
+    \node[box, below=of llm] (answer)
+        {Antwort\\{\small natürliche Sprache}};
+
+    % Zentraler OpenSearch-Vektorindex
+    \node[
+        store,
+        right=10mm of embedding,
+        yshift=9mm
+    ] (opensearch)
+        {OpenSearch-\\
+        Vektorindex\\
+        {\small Chunk-Embeddings\\und Metadaten}};
+
+    % Phasenrahmen
+    \begin{scope}[on background layer]
+
+        \node[
+            phase,
+            fit=(zim)
+                (metadata)
+                (selection)
+                (fulltext)
+                (chunking)
+                (embedding),
+            label={
+                [font=\bfseries\Large, anchor=north]
+                north:Indexierungsphase
+            }
+        ] (indexphase) {};
+
+        \node[
+            phase,
+            fit=(query)
+                (queryembed)
+                (retrieval)
+                (prompt)
+                (llm)
+                (answer),
+            label={
+                [font=\bfseries\Large, anchor=north]
+                north:Anfragephase
+            }
+        ] (queryphase) {};
+
+    \end{scope}
+
+    % Indexierungsfluss
+    \draw[arrow] (zim) -- (metadata);
+    \draw[arrow] (metadata) -- (selection);
+    \draw[arrow] (selection) -- (fulltext);
+    \draw[arrow] (fulltext) -- (chunking);
+    \draw[arrow] (chunking) -- (embedding);
+
+    \draw[arrow]
+        (embedding.east)
+        --
+        (opensearch.west);
+
+    % Anfragefluss
+    \draw[arrow] (query) -- (queryembed);
+    \draw[arrow] (queryembed) -- (retrieval);
+    \draw[arrow] (retrieval) -- (prompt);
+    \draw[arrow] (prompt) -- (llm);
+    \draw[arrow] (llm) -- (answer);
+
+    % OpenSearch -> Dense Retrieval
+    \draw[arrow]
+        (opensearch.north)
+        -- ++(0,12mm)
+        -| (retrieval.west);
+
+    \end{tikzpicture}%
+    }
+
+    \caption{Überblick über die WikiPod-Pipeline mit Indexierungs- und Anfragephase}
+    \label{fig:pipeline}
+\end{figure}
 
 \section{Projektstruktur und Konfiguration}
-% Kurz: config/default.yaml + Umgebungs-Overlays (dev/prod/pi-test), warum
-% dieser Ansatz (ein Ort fuer alle Stellschrauben, nachvollziehbar im Bericht
-% dokumentierbar statt verstreuter Magic Numbers im Code).
+
+Die Implementierung von WikiPod ist als Python-Paket aufgebaut und gliedert die
+einzelnen Verarbeitungsschritte der Pipeline in eigenständige Module. Dadurch
+bleiben Dokumentenauswahl, Indexierung, Retrieval und Antwortgenerierung
+voneinander getrennt, können jedoch über die Kommandozeilenschnittstelle zu
+einem durchgängigen Ablauf verbunden werden. Ergänzend enthält das Projekt
+separate Verzeichnisse für Konfigurationsdateien, Tests und den vorliegenden
+Bericht.
+
+Ein zentraler Bestandteil der Projektstruktur ist die konfigurationsbasierte
+Steuerung des Systems. Allgemeine Standardwerte werden in
+\texttt{config/default.yaml} definiert und können durch umgebungsspezifische
+Konfigurationsdateien überschrieben werden. Dadurch lassen sich beispielsweise
+Entwicklungs-, Test- und produktive Indexierungsläufe mit unterschiedlichen
+Ressourcenbudgets und Parametern durchführen, ohne dafür Änderungen am
+Programmcode vornehmen zu müssen.
+
+Über die Konfiguration werden unter anderem Parameter der Dokumentenauswahl,
+des Chunkings, des Embedding-Modells, der OpenSearch-Anbindung, des Retrievals
+und der lokalen Antwortgenerierung festgelegt. Die YAML-Konfiguration wird beim
+Programmstart eingelesen und anschließend durch Pydantic-Modelle validiert.
+Fehlende oder ungültige Einstellungen können dadurch frühzeitig erkannt
+werden.
+
+Dieser Ansatz vermeidet zugleich, dass experimentell bestimmte Parameter als
+fest codierte Werte über verschiedene Module verteilt werden. Dies ist für
+WikiPod insbesondere deshalb relevant, weil sich geeignete Einstellungen
+zwischen Entwicklungsumgebung und Zielhardware deutlich unterscheiden können.
+Die für einen konkreten Lauf verwendeten Parameter bleiben auf diese Weise
+nachvollziehbar und können für Evaluationen reproduziert und dokumentiert
+werden.
