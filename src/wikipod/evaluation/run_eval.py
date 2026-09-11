@@ -129,12 +129,6 @@ def run_eval(
 
         llm_judge_results.append(query_judge_results)
 
-    retrieved_titles = [
-        [chunk.article_title for chunk in chunks]
-        for chunks in retrieved_chunks
-    ]
-
-
 
     # Pro Query einzeln aufrufen, nicht mit allen Queries auf einmal -- beide
     # Funktionen sind für genau eine Query definiert (siehe Signaturen in metrics.py).
