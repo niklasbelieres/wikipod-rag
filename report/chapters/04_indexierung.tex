@@ -115,19 +115,47 @@ Anfragebearbeitung ausmacht. Eine entsprechende Messung direkt auf dem Raspberry
 \section{OpenSearch-Index-Design}
 \label{sec:opensearch-index-design}
 \label{sec:opensearch-index-design}
-% k-NN-Mapping (HNSW, nmslib-Engine, cosinesimil), warum HNSW statt exaktem
-% k-NN. Ggf. Parameter-Tuning-Ergebnisse (ef\_construction, m).
+Für die Vektorsuche wird ein Feld vom Typ \texttt{knn\_vector} mit der Methode \texttt{hnsw} verwendet.
+Der Grund für ein approximatives statt eines exakten k-NN-Verfahrens liegt in der Skalierbarkeit: Laut der OpenSearch-Dokumentation 
+berechnet exaktes k-NN die Distanz per Brute-Force zwischen der Anfrage und allen Punkten, was bei 
+\enquote{extremely large datasets with high dimensionality \ldots\ a scaling problem that reduces the efficiency of the search} erzeugt. 
+Approximative Verfahren \enquote{overcome this by employing tools that restructure indexes more efficiently 
+\ldots\ requir[ing] a sacrifice in accuracy but increas[ing] search processing speeds appreciably}~\cite{opensearch-approximate-knn}.
+
+Dieser Trade-off zulasten der Genauigkeit ist in unserem Anwendungsfall jedoch sinnvoll, da laut Dokumentation approximatives 
+k-NN \enquote{the preferred method \ldots\ when a dataset reaches hundreds of thousands of vectors} darstellt~\cite{opensearch-approximate-knn}.
+
+Als \texttt{space\_type} wird \texttt{cosinesimil} verwendet, definiert als 
+$d(x,y) = 1-\cos\theta = 1 - \frac{x\cdot y}{|x|\cdot|y|}$ ~\cite{opensearch-spaces}. Da die im Embedding-Schritt (Abschnitt~\ref{sec:embedding-modell}) 
+erzeugten Vektoren bereits L2-normalisiert sind ($|x|=|y|=1$), reduziert sich diese Distanzfunktion auf ein einfaches Skalarprodukt
+
+Die HNSW-Parameter \texttt{ef\_construction} und \texttt{m} werden im Mapping nicht explizit gesetzt und laufen damit auf den \texttt{nmslib}-Standardwerten
+$\texttt{ef\_construction}=100$, $m=16$ ~\cite{opensearch-methods-engines}. Höhere Werte würden laut Dokumentation einen genaueren Graphen bei langsamerer 
+Indexierungsgeschwindigkeit (\texttt{ef\_construction}) bzw. höherem Speicherverbrauch ($m$) erkaufen. 
+
+Für den Bulk-Indexiervorgang (\texttt{index\_chunks()}) wird jedem Chunk als OpenSearch-Dokument-\texttt{\_id} die deterministische \texttt{chunk\_id} 
+zugewiesen statt einer automatisch generierten ID. Ein wiederholter Indexierlauf überschreibt so bestehende Dokumente, statt Duplikate anzulegen, was 
+praktisch für wiederholte Testläufe ist. \texttt{create\_index()} legt den Index nur an, wenn er noch nicht existiert; ein \texttt{recreate}-Flag 
+(CLI: \texttt{--recreate-index}) erlaubt bei Bedarf das gezielte Neuanlegen, etwa nach einer Mapping-Änderung.
+
+Der lokale \texttt{docker-compose.yml}-Aufbau, mit dem während der Entwicklung getestet wurde, begrenzt den OpenSearch-Java-Heap auf 2~GB — für den 
+kleinen Testkorpus auf dem eigenen Rechner ausreichend. Der eigentliche Indexierungslauf über den vollen Korpus fand aber nicht lokal und nicht auf 
+dem Pi statt, sondern auf einem für diesen Zweck bereitgestellten leistungsstärkeren Server, wodurch Speicherknappheit als limitierender Faktor
+eliminiert wurde. Der fertige Index wurde anschließend per OpenSearch-Snapshot vom Server auf den Pi übertragen (\texttt{path.repo}-Mechanismus), 
+statt den aufwendigen Indexierungsvorgang selbst auf der eingeschränkten Zielhardware laufen zu lassen.
 
 \section{Skalierung auf den vollen Korpus}
-% Das ist der Kern eurer technischen Arbeit -- ausfuehrlich behandeln:
-%   - Erstes Problem: Worker halten ganze Bereiche im Speicher -> Batch-Fix
-%   - Zweites Problem: Volltext des gesamten Korpus im Hauptprozess -> Zwei-Pass
-%     (include_sections=False fuer Scoring, gezieltes Nachladen fuer Selektion)
-%   - Drittes Problem: Link-Listen selbst zu gross -> Interning + Cross-Prozess-
-%     Reintern + Zwei-Pass-Streaming-Architektur (JSONL-Cache)
-% Siehe PI_SCALING_NOTES.md fuer die volle Herleitung -- hier komprimiert
-% darstellen, mit Verweis auf Kapitel 6 (Deployment) fuer die Hardware-Seite
-% der Geschichte (Absturz, Diagnose, Serverloesung).
+Dieser Abschnitt betrifft nicht mehr den vollen, ungefilterten Wikipedia-Korpus, sondern die bereits durch die Selection (Kapitel~\ref{ch:dokumentenauswahl}) 
+auf das konfigurierte Speicherbudget reduzierte Teilmenge. Die aufwendige Zwei-Pass-Streaming-Architektur, die dort nötig war, greift hier nicht mehr, denn 
+Chunking, Embedding und Indexierung laufen über eine von vornherein kleinere, budgetbeschränkte Artikelmenge.
+
+Im \texttt{index}-Kommando der CLI wird die Chunk-Liste für diese gesamte ausgewählte Teilmenge auf einmal aufgebaut, statt gestreamt zu werden. Erst 
+Embedding und Indexierung selbst laufen anschließend batchweise (in Schritten von \texttt{config.embeddings.batch\_size}, standardmäßig 32): pro 
+Durchlauf werden nur die Vektoren eines Batches berechnet und indexiert, nie die aller Chunks gleichzeitig.
+
+Dass die vollständig im Speicher gehaltene Chunk-Liste hier kein Problem darstellte, hat vor allem zwei Gründe: erstens ist die Teilmenge 
+durch das Speicherbudget von Haus aus begrenzt, zweitens lief der eigentliche Indexierungslauf nicht auf dem Pi, sondern auf einem dafür 
+bereitgestellten leistungsstärkeren Server.
 
 \section{Retrieval}
 % Query-Embedding + k-NN-Suche, Retriever-Klasse als Abstraktionsschicht.
