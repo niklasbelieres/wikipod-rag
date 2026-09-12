@@ -4,11 +4,7 @@ from click.testing import CliRunner
 
 from wikipod.chunking.models import Chunk
 from wikipod.evaluation.query_analyzer import QueryAnalyzer
-from wikipod.evaluation.run_eval import (
-    load_eval_dataset,
-    main,
-    run_eval
-)
+from wikipod.evaluation.run_eval import load_eval_dataset, main, run_eval
 
 
 def _chunk(article_title: str) -> Chunk:

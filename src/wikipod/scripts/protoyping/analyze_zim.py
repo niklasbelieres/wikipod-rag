@@ -9,6 +9,7 @@ from pathlib import Path
 from wikipod.analysis.metadata import extract_metadata
 from wikipod.analysis.reader import iter_articles
 
+
 def main():
     PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -24,12 +25,6 @@ def main():
         metadata = extract_metadata(article)
         
         all_metadata.append(metadata)
-        
-    top_articles = sorted(
-        all_metadata,
-        key=lambda m: m.link_count,
-        reverse=True,
-    )
 
     print(f"Articles: {len(all_metadata)}")
 
