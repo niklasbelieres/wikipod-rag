@@ -7,8 +7,7 @@ from wikipod.evaluation.query_analyzer import QueryAnalyzer
 from wikipod.evaluation.run_eval import (
     load_eval_dataset,
     main,
-    run_eval,
-    run_single_query,
+    run_eval
 )
 
 
@@ -56,53 +55,6 @@ def test_load_eval_dataset_handles_missing_file(tmp_path):
     
     result = load_eval_dataset(path)
     assert len(result) == 0
-
-
-# -- run_single_query -------------------------------------------------------------
-def test_run_single_query_returns_article_titles():
-    retriever = MagicMock()
-    retriever.retrieve.return_value = [_chunk("Europe"), _chunk("France")]
-    
-    result = run_single_query(retriever, "Whats the capital of France?", 2)
-    assert len(result) == 2
-    assert result[0] == "Europe"
-
-
-def test_run_single_query_removes_duplicate_titles():
-    retriever = MagicMock()
-    retriever.retrieve.return_value = [
-        _chunk("Europe"),
-        _chunk("France"),
-        _chunk("France"),
-    ]
-
-    result = run_single_query(
-        retriever,
-        "Whats the capital of France?",
-        3,
-    )
-
-    assert result == ["Europe", "France"]
-
-def test_run_single_query_handles_empty_retrieval_result():
-    retriever = MagicMock()
-    retriever.retrieve.return_value = []
-    
-    result = run_single_query(retriever, "Whats the capital of France?", 3)
-    assert len(result) == 0
-
-
-def test_run_single_query_requests_more_chunks_for_deduplication():
-    retriever = MagicMock()
-    query = "Whats the capital of France?"
-    k = 3
-
-    run_single_query(retriever, query, k)
-
-    retriever.retrieve.assert_called_once_with(
-        query,
-        k=k * 4,
-    )
 
 
 # -- run_eval ------------------------------------------------------------------

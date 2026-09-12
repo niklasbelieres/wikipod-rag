@@ -27,11 +27,11 @@ DROP_SELECTORS = [
     ".toc",
 ]
 
-
 def get_content_root(html: str) -> Tag | None:
     """Parse `html` and return the cleaned `mw-parser-output` div, or None if absent."""
     soup = BeautifulSoup(html, "html.parser")
     root = soup.find(*CONTENT_SELECTOR)
+    
     if root is None:
         return None
 
@@ -56,12 +56,7 @@ def clean_text(text: str) -> str:
 
 
 def extract_categories(html: str) -> list[str]:
-    """Return category names from the page's `#catlinks` box.
-
-    Kiwix/MediaWiki renders categories as links such as
-    ``<a href="../Category:Climate_change">Climate change</a>`` in a
-    `div#catlinks`, which sits outside `mw-parser-output`, so this parses
-    the full document rather than the cleaned content root.
+    """Return category names from the page's #catlinks box.
     """
     soup = BeautifulSoup(html, "html.parser")
     catlinks = soup.find(id="catlinks") or soup.find(class_="catlinks")
@@ -113,13 +108,6 @@ def extract_links(root: Tag | None) -> list[str]:
 
 def _iter_content_nodes(tag: Tag):
     """Yield heading/paragraph/list children, transparently unwrapping <section>.
-
-    Parsoid-rendered ZIM HTML (the format modern Kiwix dumps use) wraps each
-    heading's content in a `<section data-mw-section-id="...">`, nested per
-    subsection, instead of putting headings and paragraphs side by side as
-    direct children of `mw-parser-output`. Unwrapping `<section>` here lets the
-    rest of `split_into_sections` keep using simple direct-child iteration for
-    everything else, so nested lists still can't cause double-counted text.
     """
     for child in tag.find_all(recursive=False):
         if not isinstance(child, Tag):
@@ -134,8 +122,7 @@ def split_into_sections(root: Tag | None) -> list[tuple[str, str]]:
     """Split cleaned content into (section_title, section_text) pairs.
 
     Text before the first heading is grouped under "Lead". Only direct
-    children (after unwrapping `<section>` wrappers, see `_iter_content_nodes`)
-    are inspected, so nested headings inside e.g. infoboxes (already stripped)
+    children are inspected, so nested headings inside e.g. infoboxes
     can't create spurious sections.
     """
     if root is None:

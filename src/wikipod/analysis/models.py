@@ -13,7 +13,7 @@ class Article(BaseModel):
 
 
 class Section(BaseModel):
-    """A titled block of text within an article (e.g. an H2/H3 section)."""
+    """A titled block of text within an article."""
 
     article_id: int
     article_title: str

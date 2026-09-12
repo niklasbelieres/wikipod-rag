@@ -32,17 +32,6 @@ def load_eval_dataset(path) -> list[dict]:
         return yaml.safe_load(fh) or []
 
 
-def run_single_query(retriever: Retriever, query: str, k: int) -> list[str]:
-    """Returns the top-k unique article titles for a query."""
-    chunks = retriever.retrieve(query, k=k * 4)
-
-    unique_titles = list(
-        dict.fromkeys(chunk.article_title for chunk in chunks)
-    )
-
-    return unique_titles[:k]
-
-
 def retrieve_unique_chunks(
     retriever: Retriever,
     query: str,

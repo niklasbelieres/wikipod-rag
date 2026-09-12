@@ -6,7 +6,6 @@ import json
 import logging
 import multiprocessing
 import os
-import pickle
 import sys
 from collections.abc import Callable, Iterator
 from concurrent.futures import ProcessPoolExecutor, wait
@@ -19,7 +18,7 @@ from wikipod.analysis.models import Article, ArticleMetadata
 
 logger = logging.getLogger(__name__)
 
-
+# -- basic, sequential ZIM-Reader --
 def _validate_zim_path(zim_path: Path) -> None:
     if not zim_path.exists():
         raise FileNotFoundError(f"File {zim_path} does not exist")
@@ -32,8 +31,8 @@ def iter_articles(zim_path: str | Path) -> Iterator[Article]:
     """Yield every non-redirect article contained in a .zim archive.
 
     Raises:
-        FileNotFoundError: if ``zim_path`` does not exist.
-        ValueError: if ``zim_path`` does not have a ``.zim`` extension.
+        FileNotFoundError: if `zim_path` does not exist.
+        ValueError: if `zim_path` does not have a `.zim` extension.
     """
     zim_path = Path(zim_path)
     _validate_zim_path(zim_path)
@@ -62,7 +61,7 @@ def is_html_redirect(html: str) -> bool:
     """Detect meta-refresh redirect pages that libzim doesn't flag as redirects itself."""
     return 'http-equiv="refresh"' in html and "URL=" in html
 
-
+# -- Extraction of a single article --
 def _extract_one(
     archive: Archive, article_id: int, include_sections: bool
 ) -> ArticleMetadata | None:
@@ -81,7 +80,7 @@ def _extract_one(
     article = Article(article_id=article_id, title=entry.title, html=html)
     return extract_metadata(article, include_sections=include_sections)
 
-
+# -- parallel, lightweight article extraction (include_sections=False) -- 
 def _extract_metadata_range(
     zim_path: str,
     start: int,
@@ -117,26 +116,7 @@ def _extract_metadata_range(
     return results
 
 
-def _extract_metadata_for_ids(
-    zim_path: str, article_ids: list[int]
-) -> list[ArticleMetadata]:
-    """Worker target: full extraction (with section text) for specific article_ids."""
-    archive = Archive(zim_path)
-    results: list[ArticleMetadata] = []
-
-    for article_id in article_ids:
-        try:
-            result = _extract_one(archive, article_id, include_sections=True)
-            if result is not None:
-                results.append(result)
-        except Exception:
-            logger.warning("Skipping article %s", article_id, exc_info=True)
-
-    return results
-
-
 METADATA_BATCH_SIZE = 5000
-
 
 def iter_articles_metadata_parallel(
     zim_path: str | Path,
@@ -235,6 +215,23 @@ def _reintern_in_main_process(article: ArticleMetadata) -> None:
     article.links = [sys.intern(link) for link in article.links]
     article.categories = [sys.intern(category) for category in article.categories]
 
+# -- parallel metadata extraction for specified ids
+def _extract_metadata_for_ids(
+    zim_path: str, article_ids: list[int]
+) -> list[ArticleMetadata]:
+    """Worker target: full extraction (with section text) for specific article_ids."""
+    archive = Archive(zim_path)
+    results: list[ArticleMetadata] = []
+
+    for article_id in article_ids:
+        try:
+            result = _extract_one(archive, article_id, include_sections=True)
+            if result is not None:
+                results.append(result)
+        except Exception:
+            logger.warning("Skipping article %s", article_id, exc_info=True)
+
+    return results
 
 def read_articles_metadata_for_ids(
     zim_path: str | Path,
@@ -266,77 +263,7 @@ def read_articles_metadata_for_ids(
 
     return articles
 
-
-def _load_cache(cache_path: Path) -> dict | None:
-    if not cache_path.exists():
-        return None
-    try:
-        with cache_path.open("rb") as fh:
-            return pickle.load(fh)
-    except Exception:
-        logger.warning(
-            "Failed to load article cache at %s, will re-parse.", cache_path, exc_info=True
-        )
-        return None
-
-
-def read_articles_metadata_cached(
-    zim_path: str | Path,
-    cache_path: str | Path,
-    workers: int | None = None,
-    on_progress: Callable[[int, int], None] | None = None,
-    include_sections: bool = True,
-) -> list[ArticleMetadata]:
-    """Like `read_articles_metadata_parallel`, but skips re-parsing the ZIM if a
-    cache from a previous run of the *same* file is still valid.
-
-    Re-parsing a multi-million-article ZIM is the expensive part of `wikipod
-    index`; this exists so iterating on selection weights/storage budget
-    doesn't force a full re-parse every time. The cache is keyed on the ZIM
-    file's size and mtime, *and* `include_sections` -- a cache written with
-    full section text is not a valid substitute for a lightweight request
-    (wastes memory pointlessly) and, more importantly, a lightweight cache is
-    not a valid substitute for a full request (would silently return articles
-    with no body text where text was expected).
-    """
-    zim_path = Path(zim_path)
-    cache_path = Path(cache_path)
-    _validate_zim_path(zim_path)
-
-    stat = zim_path.stat()
-    cached = _load_cache(cache_path)
-    if (
-        cached is not None
-        and cached["zim_size"] == stat.st_size
-        and cached["zim_mtime"] == stat.st_mtime
-        and cached.get("include_sections") == include_sections
-    ):
-        logger.info(
-            "Using cached article metadata from %s (%d articles)",
-            cache_path,
-            len(cached["articles"]),
-        )
-        return cached["articles"]
-
-    articles = read_articles_metadata_parallel(
-        zim_path, workers=workers, on_progress=on_progress, include_sections=include_sections
-    )
-
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    with cache_path.open("wb") as fh:
-        pickle.dump(
-            {
-                "zim_size": stat.st_size,
-                "zim_mtime": stat.st_mtime,
-                "include_sections": include_sections,
-                "articles": articles,
-            },
-            fh,
-        )
-
-    return articles
-
-
+# -- Caching with JSONL and Streaming --
 def _jsonl_cache_meta_path(cache_path: Path) -> Path:
     return cache_path.with_name(cache_path.name + ".meta.json")
 

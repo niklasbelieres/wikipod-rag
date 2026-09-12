@@ -1,3 +1,8 @@
+"""
+Prototyping script to get an insight into prob. useful metadata
+in wikipedia-articles.
+Not for productive usage."""
+
 from pathlib import Path
 
 from wikipod.analysis.metadata import extract_metadata
