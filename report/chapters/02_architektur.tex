@@ -10,11 +10,11 @@ Der Zugriff auf diese Dateien erfolgt in Python über \texttt{libzim}. Die in de
 Artikeln enthaltenen HTML-Dokumente werden mit \texttt{BeautifulSoup} verarbeitet,
 um Textinhalte und Metadaten zu extrahieren.
 
-Für die semantische Repräsentation der Textabschnitte kommt die Bibliothek
-\texttt{sentence-transformers} zum Einsatz. Die erzeugten dichten Vektoren werden
-gemeinsam mit den zugehörigen Metadaten in OpenSearch gespeichert und dort für
-das k-NN-basierte Retrieval verwendet. Die Auswahl von KIWIX beziehungsweise ZIM
-als Datenformat und OpenSearch als Retrieval-System ergibt sich unmittelbar aus
+Für die semantische Repräsentation der Textabschnitte wird die Bibliothek
+sentence-\allowbreak transformers verwendet. Die daraus erzeugten dichten Vektoren
+werden gemeinsam mit den zugehörigen Metadaten in OpenSearch gespeichert und
+dort für das k-NN-basierte Retrieval genutzt. KIWIX beziehungsweise ZIM als
+Datenformat und OpenSearch als Retrieval-System ergeben sich unmittelbar aus
 der Aufgabenstellung des Projekts.
 
 Die lokale Antwortgenerierung wird über ein kleines Sprachmodell realisiert.

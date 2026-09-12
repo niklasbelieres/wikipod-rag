@@ -8,6 +8,34 @@
 % Erstdiagnosen trafen jeweils einen echten, aber nicht dominanten Faktor --
 % erst die Frage "wie viele Objekte leben gleichzeitig" fuehrte zur Loesung.
 % Das ist eine uebertragbare Erkenntnis, nicht nur eine Randnotiz.
+Eine zentrale Herausforderung bei der Verarbeitung des vollständigen
+Wikipedia-Korpus war der stark ansteigende Speicherbedarf. Während die
+Verarbeitung kleinerer Datenmengen zunächst unauffällig verlief, zeigte sich
+beim Skalieren auf den vollständigen Korpus, dass zuvor verwendete
+In-Memory-Ansätze nicht ausreichend skalieren. Die Fehlersuche konzentrierte
+sich zunächst auf einzelne speicherintensive Datenstrukturen und
+Verarbeitungsschritte. Diese Faktoren trugen zwar zum Speicherverbrauch bei,
+erklärten dessen Größenordnung jedoch nicht vollständig.
+
+Entscheidend war letztlich nicht allein die Größe einzelner Objekte, sondern
+die Anzahl der Objekte, die während der Verarbeitung gleichzeitig im Speicher
+gehalten wurden. Dadurch konnte sich ein für einen einzelnen Artikel
+unkritischer Speicherbedarf über mehrere Millionen Artikel zu einem erheblichen
+Gesamtspeicherbedarf aufsummieren. Diese Beobachtung führte zu einer
+grundlegenderen Betrachtung der Verarbeitungspipeline: Statt lediglich einzelne
+Datenstrukturen zu optimieren, musste die Lebensdauer der Daten im Speicher
+reduziert werden.
+
+Daraus ergibt sich als übertragbare Erkenntnis, dass bei der Verarbeitung
+großer Korpora nicht nur die Größe einzelner Datenstrukturen betrachtet werden
+sollte. Ebenso relevant ist, wie viele dieser Strukturen gleichzeitig
+existieren und zu welchem Zeitpunkt sie wieder freigegeben werden können. Für
+WikiPod war diese Erkenntnis insbesondere für die Skalierung vom kleinen
+Evaluationskorpus auf den vollständigen Wikipedia-Bestand von Bedeutung und
+motivierte eine stärker streamingorientierte Verarbeitung, bei der
+Zwischenergebnisse möglichst früh weiterverarbeitet beziehungsweise
+persistiert werden, anstatt sie über den gesamten Verarbeitungslauf im
+Arbeitsspeicher zu halten.
 
 \section{Designentscheidungen im Rueckblick}
 % Was wuerdet ihr nochmal genauso machen, was anders (z. B. frueher auf
@@ -36,3 +64,49 @@ Zeitgründen nicht mehr umgesetzt.
 \section{Grenzen der Loesung}
 % Was deckt das System bewusst nicht ab (z. B. nur englische Wikipedia,
 % keine Multi-Turn-Konversation, Kategorien-Signal nicht genutzt, ...).
+
+Die entwickelte Lösung unterliegt mehreren Einschränkungen, die bei der
+Einordnung der Ergebnisse berücksichtigt werden müssen. Eine grundlegende
+Einschränkung ergibt sich aus der verwendeten Wissensbasis. WikiPod verarbeitet
+ausschließlich Inhalte der englischsprachigen Wikipedia. Andere Sprachversionen
+sowie zusätzliche externe Wissensquellen werden nicht berücksichtigt. Die
+verfügbaren Informationen sind damit unmittelbar durch den Inhalt und den
+Stand der lokal verwendeten Wikipedia-Kopie begrenzt.
+
+Eine weitere Einschränkung betrifft die Auswahl der lokal vorgehaltenen
+Dokumente. Aufgrund des vorgegebenen Speicherbudgets kann nur ein Teil des
+verfügbaren Wikipedia-Bestands berücksichtigt werden. Die Auswahl basiert auf
+dem entwickelten Scoring-Verfahren und stellt daher keine Garantie dafür dar,
+dass für jede mögliche Nutzeranfrage der relevanteste Artikel im lokalen
+Bestand enthalten ist. Wie die Analyse des Scoring-Modells gezeigt hat,
+entspricht der tatsächliche Einfluss der verwendeten Signale zudem nicht in
+allen Fällen ihrer konfigurierten Gewichtung. Insbesondere die Dominanz von
+\texttt{importance} kann die Zusammensetzung der ausgewählten Teilmenge
+beeinflussen.
+
+Auch die Evaluation ist in ihrer Aussagekraft begrenzt. Der reguläre
+Evaluationsdatensatz umfasst 20 Anfragen und wurde ebenso wie der zusätzliche
+Edge-Case-Datensatz manuell zusammengestellt. Die gemessenen Retrieval-Metriken
+beschreiben daher zuverlässig das Verhalten auf den untersuchten Anfragen,
+lassen sich jedoch nicht ohne Weiteres auf die Gesamtheit möglicher
+Nutzeranfragen übertragen. Insbesondere seltene Themen, weitere mehrdeutige
+Bezeichnungen und Anfragen außerhalb des lokal verfügbaren Wissensbestands
+können in den verwendeten Datensätzen nur eingeschränkt abgebildet werden.
+
+Darüber hinaus wurde die Qualität der generierten Antworten nicht mit einer
+stabilen quantitativen Metrik bewertet. Der im Rahmen der Evaluation erprobte
+LLM-Judge zeigte bei einzelnen Anfragen inkonsistente Bewertungen und wurde
+deshalb nicht als alleinige Grundlage für einen quantitativen Vergleich der
+Antwortqualität verwendet. Der Vergleich der lokalen Sprachmodelle erlaubt
+somit vor allem Aussagen über deren Generierungslatenz auf der Zielhardware,
+nicht jedoch darüber, welches Modell insgesamt die höchste inhaltliche
+Antwortqualität liefert.
+
+Schließlich setzt die lokale Ausführung auf dem Raspberry Pi der Lösung
+praktische Leistungsgrenzen. Während das semantische Retrieval im untersuchten
+Aufbau mit vergleichsweise geringer Latenz durchgeführt werden konnte, benötigt
+die lokale Antwortgenerierung deutlich mehr Zeit und stellt damit den
+dominierenden Anteil der Antwortzeit dar. Die vollständig lokale Ausführung
+ermöglicht zwar den Betrieb ohne bestehende Internetverbindung, geht auf der
+verwendeten Hardware jedoch mit einem deutlichen Kompromiss zwischen
+Modellgröße, Ressourcenbedarf und Generierungsgeschwindigkeit einher.

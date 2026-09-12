@@ -4,14 +4,268 @@
 \section{Vollstaendige Konfigurationsdateien}
 % ggf. config/prod.yaml o.ae. als Listing, falls im Haupttext nur Auszuege stehen.
 
+Die folgende Konfiguration entspricht der vorgesehenen
+Produktivkonfiguration für den Raspberry Pi~5 mit 16~GB Arbeitsspeicher
+und 1~TB SSD. Sie definiert unter anderem die Pfade zum Wikipedia-ZIM und
+zu den aggregierten Pageviews, das Speicherbudget und die Gewichte der
+Dokumentenauswahl, die OpenSearch-Verbindung sowie das verwendete lokale
+Sprachmodell.
+
+\begin{lstlisting}
+# Overrides for the target deployment (Raspberry Pi 5, 16 GB RAM, 1 TB SSD).
+paths:
+  zim_file: "/data/raw/wikipedia_en_all_mini.zim"
+  data_dir: "/data"
+  # Produce this with:
+  # wikipod fetch-pageviews --date <YYYY-MM-DD>
+  # --out /data/pageviews-aggregated.txt
+  pageviews_file: "/data/pageviews-aggregated.txt"
+
+selection:
+  storage_budget_mb: 200000 # ~200 GB
+  weights:
+    word_count: 0.15
+    link_count: 0.15
+    importance: 0.15
+    incoming_links: 0.25
+    pageviews: 0.3
+
+opensearch:
+  host: "localhost"
+  port: 9200
+  index_name: "wikipod-chunks-server"
+
+llm:
+  backend: "llama_cpp"
+  model_path: "models/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+\end{lstlisting}
+
 \section{CI/CD-Pipeline}
 % Kurzer Verweis + ggf. Listing von .github/workflows/ci.yaml, falls fuer
 % den Bericht relevant (Testabdeckung/Qualitaetssicherung als Teil des
 % "generelle Vorgehensweise"-Punkts aus der Aufgabenstellung).
 
+Zur automatisierten Qualitätssicherung wird GitHub Actions eingesetzt. Die
+CI-Pipeline wird sowohl bei Pushes auf den Branch \texttt{main} als auch bei
+Pull Requests gegen \texttt{main} ausgeführt. Sie besteht aus zwei getrennten
+Jobs für statische Codeprüfung und automatisierte Tests.
+
+Der Job \texttt{lint} verwendet Python~3.12 und führt nach der Installation
+der Entwicklungsabhängigkeiten mit \texttt{ruff check .} eine statische
+Codeprüfung des Projekts durch.
+
+Der Job \texttt{test} führt die Tests mittels \texttt{pytest} für die
+Python-Versionen 3.11, 3.12 und 3.13 aus. Da Teile der Anwendung OpenSearch
+benötigen, wird während dieses Jobs zusätzlich eine
+OpenSearch-2.17.0-Instanz als Service gestartet. Ein Healthcheck stellt sicher,
+dass der Dienst vor der Ausführung der Tests erreichbar ist.
+
+Die vollständige CI-Konfiguration ist nachfolgend dargestellt:
+
+\begin{lstlisting}[caption={CI-Konfiguration des Projekts}]
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[dev]"
+
+      - name: ruff check
+        run: ruff check .
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    services:
+      opensearch:
+        image: opensearchproject/opensearch:2.17.0
+        env:
+          discovery.type: single-node
+          plugins.security.disabled: "true"
+          OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+          DISABLE_INSTALL_DEMO_CONFIG: "true"
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd="curl -s http://localhost:9200/_cluster/health || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: setup python (${{ matrix.python-version }})
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[dev]"
+
+      - name: run pytest
+        run: pytest
+\end{lstlisting}
+
 \section{Vollstaendige Eval-Ergebnisse}
 % Tabelle aller Eval-Queries mit Einzelwerten (recall\_at\_k, reciprocal\_rank),
 % falls das im Hauptteil nur aggregiert gezeigt wird.
+
+Die folgenden Tabellen zeigen die Einzelresultate der in
+Kapitel~\ref{ch:evaluation} beschriebenen Retrieval-Evaluation. Fuer den
+regulaeren Evaluationsdatensatz sind die Ergebnisse fuer $k=5$ dargestellt.
+Da bei $k=10$ dieselben relevanten Artikel mit denselben Rangpositionen
+gefunden wurden, bleiben Recall und Reciprocal Rank gegenueber $k=5$
+unveraendert. Lediglich die Precision sinkt aufgrund der groesseren Anzahl
+betrachteter Ergebnisse von $0{,}2$ auf $0{,}1$.
+\small
+\begin{longtable}{@{}p{6.4cm}p{3.6cm}p{1.5cm}p{1cm}@{}}
+\caption{Einzelergebnisse des regulaeren Evaluationsdatensatzes bei $k=5$}
+\label{tab:eval-einzel-regulaer}\\
+\toprule
+Anfrage & Ground Truth & Recall@5 & RR \\
+\midrule
+\endfirsthead
+
+\toprule
+Anfrage & Ground Truth & Recall@5 & RR \\
+\midrule
+\endhead
+
+\bottomrule
+\endfoot
+
+Which music group did Michael Jackson perform with before becoming a successful solo artist?
+& Michael Jackson & 1,0 & 1,0 \\
+
+Which British king served as prince regent during his father's mental illness before becoming king himself?
+& George IV & 1,0 & 0,5 \\
+
+Which South African anti-apartheid activist spent 27 years in prison before becoming the country's first black president?
+& Nelson Mandela & 1,0 & 1,0 \\
+
+When and under which ruler did the Roman Empire become permanently divided into eastern and western parts?
+& List of Roman emperors & 1,0 & 1,0 \\
+
+How did the California Gold Rush contribute to California becoming a U.S. state?
+& California gold rush & 1,0 & 1,0 \\
+
+What political and legal arguments were used to justify the American colonies' separation from Great Britain in 1776?
+& United States Declaration of Independence & 1,0 & 1,0 \\
+
+How did Reconstruction and the civil rights movement change the political and social status of Black Americans in the United States?
+& African Americans & 1,0 & 1,0 \\
+
+How did U.S. policies toward Native Americans shift from forced removal and assimilation toward tribal self-determination?
+& Native Americans in the United States & 1,0 & 1,0 \\
+
+How can mutations in a gene lead to different observable traits in a population?
+& Gene & 1,0 & 0,5 \\
+
+Why can viruses not reproduce independently outside of a host cell?
+& Virus & 1,0 & 1,0 \\
+
+Which evolutionary processes cause heritable traits to become more or less common in a population over generations?
+& Evolution & 1,0 & 1,0 \\
+
+Why can a solar eclipse only occur near a new moon, and why does the Moon usually pass above or below the Sun instead of blocking it?
+& Solar eclipse & 1,0 & 1,0 \\
+
+What meteorological process occurs when condensed atmospheric water becomes too heavy to remain suspended in clouds and falls as rain, snow, hail, or other forms?
+& Precipitation & 1,0 & 1,0 \\
+
+What continent surrounds the South Pole, is mostly covered by a thick ice sheet, and is the coldest and driest continent on Earth?
+& Antarctica & 1,0 & 1,0 \\
+
+Which U.S. state has the most national parks, and how many national parks does it have?
+& List of national parks of the United States & 1,0 & 1,0 \\
+
+Which city is the capital of the United Kingdom, stands on the River Thames, and was originally founded by the Romans as Londinium?
+& London & 1,0 & 1,0 \\
+
+How did the original World Trade Center towers reduce the number of elevator shafts while still serving 110 floors?
+& World Trade Center (1973--2001) & 1,0 & 1,0 \\
+
+What type of electronic game uses an input device such as a controller, keyboard, or joystick to produce visual feedback on a screen?
+& Video game & 1,0 & 1,0 \\
+
+Which Christian church is headed by the pope, governed centrally through the Holy See, and consists of the Latin Church and 23 Eastern Catholic Churches?
+& Catholic Church & 1,0 & 1,0 \\
+
+Which Mesoamerican civilization developed a sophisticated hieroglyphic writing system, complex calendars, monumental temples, and an early use of the number zero?
+& Maya civilization & 1,0 & 1,0 \\
+\end{longtable}
+
+Die Edge-Case-Evaluation untersucht zusätzlich ähnliche Entitäten, Aliase,
+Tippfehler, kurze Anfragen und eine Anfrage außerhalb des indexierten Korpus.
+Tabelle~\ref{tab:eval-edge-cases} stellt die Ergebnisse ohne und mit Query
+Analyzer gegenüber. Angegeben ist jeweils der Reciprocal Rank bei $k=5$.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Edge-Case-Evaluation ohne und mit Query Analyzer bei $k=5$}
+\label{tab:eval-edge-cases}
+\begin{tabular}{p{5.8cm}lrr}
+\toprule
+Anfrage & Kategorie & RR Baseline & RR Analyzer \\
+\midrule
+Tell me about beetles & similar\_entity & 1,0 & 1,0 \\
+Who were the Beatles? & similar\_entity & 1,0 & 1,0 \\
+Who was George III? & similar\_entity & 1,0 & 1,0 \\
+Who was George IV? & similar\_entity & 0,5 & 0,5 \\
+Tell me about the District of Columbia & alias & 1,0 & 1,0 \\
+Tell me about the Roman Catholic Church & alias & 1,0 & 1,0 \\
+Tell me about dinasaurs & typo & 1,0 & 1,0 \\
+Who was Geogre III? & typo & 1,0 & 1,0 \\
+Cathlic Chuch & typo & 0,0 & 1,0 \\
+Beetle & short & 1,0 & 1,0 \\
+George III & short & 1,0 & 1,0 \\
+Tell me about Albert Einstein & out\_of\_scope & 0,0 & 0,0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Der deutlichste Effekt des Query Analyzers zeigt sich bei der fehlerhaften
+Anfrage \texttt{Cathlic Chuch}: Ohne Normalisierung wird der relevante Artikel
+\textit{Catholic Church} nicht unter den ersten fünf Treffern gefunden
+($RR=0$). Der Query Analyzer normalisiert die Anfrage zu
+\texttt{Catholic Church}, wodurch der relevante Artikel auf Rang~1 erscheint
+($RR=1$). Auch \texttt{Geogre III} wird zu \texttt{George III} normalisiert,
+ohne dass sich der Reciprocal Rank verändert, da der relevante Artikel bereits
+in der Baseline auf Rang~1 gefunden wurde. Die als \texttt{out\_of\_scope}
+markierte Einstein-Anfrage besitzt keinen relevanten Zieltitel im verwendeten
+Korpus und wird daher in beiden Läufen mit $RR=0$ ausgewiesen.
 
 \section{Weitere Diagramme}
 % Alles aus dem Analyse-Notebook, was im Haupttext keinen Platz hatte.

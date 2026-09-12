@@ -11,40 +11,12 @@ relevante Textpassagen als Kontext für das Large-Language-Modell abgerufen werd
 Textpassagen als Retrieval-Einheiten stellt dabei einen etablierten Ansatz im Dense Retrieval dar
 ~\cite{karpukhin-etal-2020-dense}.
 
-Damit die im vorherigen Pipeline-Schritt ausgewählte Wikipedia-Teilmenge von einem Large-Language-Modell genutzt
-werden kann, müssen diese Artikel zunächst in geeignete Textabschnitte (Chunks) unterteilt werden, bevor diese
-als dichte Vektoren indexiert werden können. Die Aufteilung ermöglicht eine granularere Suche nach relevanten
-Informationen, da bei einer Anfrage nicht zwangsläufig ein vollständiger Wikipedia-Artikel, sondern gezielt
-relevante Textpassagen als Kontext für das Large-Language-Modell abgerufen werden können. Die Verwendung von
-Textpassagen als Retrieval-Einheiten stellt dabei einen etablierten Ansatz im Dense Retrieval dar
-~\cite{karpukhin-etal-2020-dense}.
-
 \section{Chunking-Strategie}
 \label{sec:chunking-strategie}
 
-Die Zerlegung der Wikipedia-Artikel erfolgt abschnittsweise. Hierzu iteriert die Methode
-\texttt{chunk\_article()} über die in \texttt{article.sections} enthaltenen Abschnitte. Dadurch wird
-sichergestellt, dass ein Chunk ausschließlich Text aus einem einzelnen Wikipedia-Abschnitt enthält und
-der inhaltliche Zusammenhang der jeweiligen Passage erhalten bleibt.
-
-Innerhalb eines Abschnitts werden die Texte mit einer maximalen Fenstergröße von 250 Wörtern und einer
-Überlappung von 40 Wörtern unterteilt. Die Wahl der Chunk-Größe stellt einen Kompromiss zwischen der
-Granularität des Retrievals und dem Erhalt ausreichenden Kontextes dar. Untersuchungen zeigen, dass die
-optimale Chunk-Größe von der Charakteristik der Daten, der konkreten Retrieval-Aufgabe und dem verwendeten
-Embedding-Modell abhängt und daher nicht allgemein festgelegt werden kann
-~\cite{bhat2025rethinkingchunksizelongdocument}. Die für dieses Projekt verwendete Fenstergröße wurde
-daher als geeigneter Kompromiss für den verwendeten Wikipedia-Korpus und das nachfolgende Retrieval
-festgelegt.
-
-Die Überlappung soll verhindern, dass zusammengehörige Informationen durch eine Chunk-Grenze vollständig
-voneinander getrennt werden. Zusätzlich enthält jeder Chunk Metadaten, insbesondere den Titel des
-zugehörigen Wikipedia-Abschnitts. Diese werden im weiteren Verlauf der Pipeline verwendet, um die Herkunft
-der abgerufenen Textpassagen im Prompt kenntlich zu machen und eine Quellenattribution zu ermöglichen.
-
-\label{sec:chunking-strategie}
-
-Die Zerlegung der Wikipedia-Artikel erfolgt abschnittsweise. Hierzu iteriert die Methode
-\texttt{chunk\_article()} über die in \texttt{article.sections} enthaltenen Abschnitte. Dadurch wird
+Die Zerlegung der Wikipedia-Artikel erfolgt abschnittsweise. Die Methode
+\texttt{chunk\_article()} verarbeitet dazu die im Artikelobjekt gespeicherten
+Abschnitte einzeln. Dadurch wird
 sichergestellt, dass ein Chunk ausschließlich Text aus einem einzelnen Wikipedia-Abschnitt enthält und
 der inhaltliche Zusammenhang der jeweiligen Passage erhalten bleibt.
 
@@ -64,6 +36,7 @@ der abgerufenen Textpassagen im Prompt kenntlich zu machen und eine Quellenattri
 
 
 \section{Embedding-Modell}
+\label{sec:embedding-modell}
 
 Als Embedding-Modell kommt \texttt{sentence-transformers/all-MiniLM-L6-v2} zum Einsatz, welches jeden
 Chunk-Text auf einen 384-dimensionalen dichten Vektor abbildet~\cite{minilm-model-card}. Mit 22,7 Millionen
@@ -74,7 +47,7 @@ höherem Rechenaufwand bietet~\cite{sbert-pretrained-models}.
 
 Für das Projekt ist insbesondere der geringere Rechenaufwand relevant, da sowohl das initiale Embedding der
 ausgewählten Chunks während der Indexierung als auch das Embedding eingehender Anfragen auf der vorgesehenen
-CPU-only-Hardware ausgeführt werden muss. \texttt{all-MiniLM-L6-v2} stellt hierfür einen geeigneten
+CPU-only-Hardware ausgeführt werden muss. Das Modell \texttt{all-MiniLM-L6-v2} stellt hierfür einen geeigneten
 Kompromiss zwischen Modellgröße und Embedding-Qualität dar.
 
 Das Modell wurde auf über 1,17~Milliarden Satzpaaren aus unterschiedlichen Quellen trainiert und ist unter
@@ -114,7 +87,6 @@ Anfragebearbeitung ausmacht. Eine entsprechende Messung direkt auf dem Raspberry
 
 \section{OpenSearch-Index-Design}
 \label{sec:opensearch-index-design}
-\label{sec:opensearch-index-design}
 Für die Vektorsuche wird ein Feld vom Typ \texttt{knn\_vector} mit der Methode \texttt{hnsw} verwendet.
 Der Grund für ein approximatives statt eines exakten k-NN-Verfahrens liegt in der Skalierbarkeit: Laut der OpenSearch-Dokumentation 
 berechnet exaktes k-NN die Distanz per Brute-Force zwischen der Anfrage und allen Punkten, was bei 
@@ -133,9 +105,10 @@ Die HNSW-Parameter \texttt{ef\_construction} und \texttt{m} werden im Mapping ni
 $\texttt{ef\_construction}=100$, $m=16$ ~\cite{opensearch-methods-engines}. Höhere Werte würden laut Dokumentation einen genaueren Graphen bei langsamerer 
 Indexierungsgeschwindigkeit (\texttt{ef\_construction}) bzw. höherem Speicherverbrauch ($m$) erkaufen. 
 
-Für den Bulk-Indexiervorgang (\texttt{index\_chunks()}) wird jedem Chunk als OpenSearch-Dokument-\texttt{\_id} die deterministische \texttt{chunk\_id} 
-zugewiesen statt einer automatisch generierten ID. Ein wiederholter Indexierlauf überschreibt so bestehende Dokumente, statt Duplikate anzulegen, was 
-praktisch für wiederholte Testläufe ist. \texttt{create\_index()} legt den Index nur an, wenn er noch nicht existiert; ein \texttt{recreate}-Flag 
+Für den Bulk-Indexiervorgang (\texttt{index\_chunks()}) wird die deterministische
+\texttt{chunk\_id} jedes Chunks als Dokument-ID in OpenSearch verwendet.
+Ein wiederholter Indexierlauf überschreibt so bestehende Dokumente, statt
+Duplikate anzulegen, was praktisch für wiederholte Testläufe ist. \texttt{create\_index()} legt den Index nur an, wenn er noch nicht existiert; ein \texttt{recreate}-Flag
 (CLI: \texttt{--recreate-index}) erlaubt bei Bedarf das gezielte Neuanlegen, etwa nach einer Mapping-Änderung.
 
 Der lokale \texttt{docker-compose.yml}-Aufbau, mit dem während der Entwicklung getestet wurde, begrenzt den OpenSearch-Java-Heap auf 2~GB — für den 

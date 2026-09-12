@@ -5,8 +5,128 @@
 % Kurze Zusammenfassung: welche der 5 Fragestellungen wurden wie
 % beantwortet, Gesamteinschaetzung.
 
+Im Rahmen von WikiPod wurde untersucht, inwieweit sich ein lokaler Zugriff auf
+ausgewählte Inhalte der englischsprachigen Wikipedia mit semantischem Retrieval
+und lokaler Antwortgenerierung auf eingeschränkter Hardware umsetzen lässt.
+Ausgehend von den fünf in der Aufgabenstellung formulierten Anforderungen wurde
+dafür eine durchgängige Pipeline von der lokalen Wikipedia-Kopie über die
+Dokumentenauswahl und Vektorindexierung bis hin zur Retrieval-Augmented-
+Generation und deren Evaluation entwickelt.
+
+Die erste Anforderung bestand in der Bereitstellung einer lokalen Kopie der
+englischsprachigen Wikipedia. Hierfür werden Wikipedia-Inhalte in Form einer
+lokal gespeicherten ZIM-Datei verwendet, die ohne bestehende Internetverbindung
+verarbeitet werden kann. Damit bildet die ZIM-Datei die Grundlage für den
+vollständig lokalen Zugriff auf den verfügbaren Wikipedia-Bestand.
+
+Für die zweite Anforderung, die Entwicklung einer Methode zur Auswahl einer
+Teilmenge der Wikipedia, wurde ein budgetbeschränktes Auswahlverfahren
+implementiert. Die Artikel werden anhand mehrerer Metadaten und
+Struktursignale bewertet und anschließend nach ihrem Verhältnis von Score zu
+Speicherbedarf priorisiert. Im produktiven Selektionslauf auf dem vollständigen
+Korpus wurden aus 7.322.195 Kandidatenartikeln 1.638.375 Artikel ausgewählt und
+das konfigurierte Speicherbudget von 13.000~MB praktisch vollständig
+ausgeschöpft. Die Analyse des Scoring-Modells zeigte jedoch zugleich, dass die
+tatsächlichen Beiträge der einzelnen Signale nicht proportional zu ihren
+konfigurierten Gewichten ausfallen. Insbesondere das Signal
+\texttt{importance} besitzt einen deutlich größeren Einfluss auf den
+Gesamtscore als ursprünglich durch seine Gewichtung beabsichtigt.
+
+Die dritte Anforderung, die Indexierung der ausgewählten Teilmenge als dichte
+Vektoren mittels OpenSearch, wurde durch eine Chunking- und Embedding-Pipeline
+umgesetzt. Die ausgewählten Artikel werden abschnittsweise in Text-Chunks
+zerlegt und mit \texttt{all-MiniLM-L6-v2} in dichte Vektorrepräsentationen
+überführt \cite{minilm-model-card,sbert-pretrained-models}. Dense
+Passage Retrieval zeigt grundsätzlich, dass dichte Repräsentationen für
+semantisches Passage Retrieval im Open-Domain-Question-Answering eingesetzt
+werden können \cite{karpukhin-etal-2020-dense}. Diese werden gemeinsam mit den
+zugehörigen Metadaten in OpenSearch gespeichert. Für eingehende Nutzeranfragen
+wird dasselbe Embedding-Modell verwendet, sodass über die Vektorsuche
+semantisch ähnliche Textpassagen ermittelt und für die weitere Verarbeitung
+bereitgestellt werden können.
+
+Zur Beantwortung der vierten Anforderung wurden drei lokal ausführbare
+Sprachmodelle auf dem Raspberry Pi hinsichtlich ihrer Generierungslatenz
+verglichen. Qwen2.5~1.5B~Q4 erreichte mit durchschnittlich $27{,}97$~s die
+niedrigste gemessene Generierungszeit, gefolgt von Llama~3.2~1B~Q4 mit
+$29{,}18$~s und Phi-3.5~Mini~Q4 mit $152{,}33$~s. Für die Zielkonfiguration
+wird daher Qwen2.5~1.5B in quantisierter Form über das
+\texttt{llama\_cpp}-Backend eingesetzt. Diese Auswahl stützt sich auf die
+gemessene Laufzeit und die erfolgreiche Ausführung auf der Zielhardware. Da
+für den Modellvergleich keine quantitative Bewertung der Antwortqualität
+durchgeführt wurde, kann daraus jedoch nicht abgeleitet werden, dass Qwen2.5
+auch hinsichtlich der generierten Inhalte das qualitativ beste der
+untersuchten Modelle ist.
+
+Die fünfte Anforderung bestand in der Evaluation der entwickelten Lösung
+hinsichtlich Effektivität und Effizienz. Auf dem regulären
+Evaluationsdatensatz mit 20 Anfragen erreichte das Retrieval sowohl bei
+$k=5$ als auch bei $k=10$ einen Recall von $1{,}000$, einen MRR von
+$0{,}950$ und einen mittleren nDCG-Wert von $0{,}963$. Auf dem separaten
+Edge-Case-Datensatz verbesserte der Query Analyzer den Recall@5 von
+$0{,}833$ auf $0{,}917$ und den MRR von $0{,}792$ auf $0{,}875$. Die
+mittlere Retrieval-Latenz auf dem Raspberry Pi betrug im untersuchten
+Evaluationsaufbau $62{,}78$~ms und lag damit deutlich unter den
+Generierungszeiten der lokalen Sprachmodelle. Die Antwortgenerierung stellt
+somit in diesem Versuchsaufbau den zeitlich dominierenden Teil der
+Anfragebearbeitung dar. Gleichzeitig ist die Aussagekraft der
+Retrieval-Evaluation durch die geringe Größe und die manuelle Zusammenstellung
+der verwendeten Evaluationsdatensätze begrenzt.
+
+Zusammenfassend wurden alle fünf zentralen Anforderungen der Projektarbeit
+umgesetzt beziehungsweise experimentell untersucht. Wikipedia-Inhalte können
+lokal bereitgestellt, unter einem vorgegebenen Speicherbudget auf eine
+Teilmenge reduziert, als dichte Vektoren in OpenSearch indexiert und für
+semantisches Retrieval mit anschließender lokaler Antwortgenerierung genutzt
+werden. Die Messungen zeigen, dass der grundsätzliche Betrieb der entwickelten
+Pipeline auf dem Raspberry Pi möglich ist. Gleichzeitig bleiben insbesondere
+die Gewichtung des Auswahlverfahrens, die begrenzte Breite der Evaluation und
+die vergleichsweise hohe Laufzeit der lokalen Sprachmodellgenerierung als
+wesentliche Einschränkungen der aktuellen Lösung bestehen.
+
 \section{Ausblick}
 % Was waere der naechste Schritt mit mehr Zeit -- z. B. voller Korpus auf
 % dem Pi (Build/Serve-Trennung produktiv nutzen), Kategorien-basierte
 % diversitaetsbewusste Selection, generierungsseitige Evaluationsmetriken
 % (ROUGE/LLM-as-Judge) zusaetzlich zu Recall@k/MRR.
+
+Ein naheliegender nächster Schritt besteht darin, die entwickelte Pipeline auf
+einem deutlich größeren Wikipedia-Bestand unter der vorgesehenen
+Zielkonfiguration zu betreiben. Die Architektur trennt die aufwendige
+Aufbereitung und Indexierung von der späteren Nutzung des Systems, sodass ein
+umfangreicher Index auf leistungsfähigerer Hardware erzeugt und anschließend
+auf den Raspberry Pi übertragen werden kann. Dadurch ließe sich untersuchen,
+wie sich die im kleinen Evaluationskorpus beobachteten Ergebnisse auf einen
+realistischeren Datenbestand übertragen und wie sich insbesondere Indexgröße,
+Speicherbedarf und Retrieval-Latenz bei wachsendem Korpus entwickeln.
+Weiteres Verbesserungspotenzial besteht bei der Dokumentenauswahl. Die
+Evaluation des Scoring-Verfahrens hat gezeigt, dass die tatsächlichen Beiträge
+der verwendeten Signale nicht unmittelbar ihren konfigurierten Gewichten
+entsprechen. Zukünftige Arbeiten sollten deshalb die Eingangssignale stärker
+normalisieren und die Gewichte systematisch auf einem geeigneten
+Evaluationsdatensatz bestimmen. Zusätzlich könnte eine kategorien- oder
+themenbasierte Auswahl eingesetzt werden, um neben der geschätzten Relevanz
+eines einzelnen Artikels auch die inhaltliche Diversität der ausgewählten
+Wikipedia-Teilmenge zu berücksichtigen.
+Auch die Retrieval-Evaluation sollte auf einen größeren und systematischer
+zusammengestellten Datensatz erweitert werden. Neben zusätzlichen regulären
+Anfragen sollten insbesondere mehrdeutige Entitäten, alternative
+Bezeichnungen, Tippfehler, sehr kurze Anfragen und Out-of-Scope-Fälle stärker
+vertreten sein. Für Out-of-Scope-Anfragen wäre zudem eine separate
+Bewertungslogik sinnvoll, da die bisher verwendeten klassischen
+Retrieval-Metriken Fälle ohne relevanten Ground-Truth-Artikel nicht angemessen
+von gewöhnlichen Retrieval-Fehlern unterscheiden. Der Query Analyzer könnte
+auf dieser Grundlage gezielter weiterentwickelt und seine Wirkung auf
+unterschiedliche Fehlerklassen untersucht werden.
+Schließlich sollte neben dem Retrieval auch die Qualität der generierten
+Antworten systematisch evaluiert werden. Der bisher erprobte LLM-Judge zeigte
+in einzelnen Fällen inkonsistente Bewertungen und eignet sich in seiner
+aktuellen Form daher nicht als alleinige quantitative Qualitätsmetrik. Eine
+zukünftige Evaluation könnte manuell bewertete Referenzantworten mit
+automatisierten Verfahren kombinieren und dabei insbesondere Faktentreue,
+Relevanz, Vollständigkeit und die korrekte Nutzung des bereitgestellten
+Retrieval-Kontexts betrachten. Auf dieser Grundlage ließen sich die
+untersuchten lokalen Sprachmodelle nicht nur hinsichtlich ihrer Laufzeit,
+sondern auch hinsichtlich ihrer Antwortqualität vergleichen. Damit wäre eine
+fundiertere Abwägung zwischen Ressourcenbedarf, Generierungslatenz und
+Antwortqualität für den Einsatz auf dem Raspberry Pi möglich.
