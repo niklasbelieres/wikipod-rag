@@ -1,35 +1,169 @@
 \chapter{Anleitung: Inbetriebnahme}
 \label{ch:anleitung}
-% Explizit vom Betreuer gewuenscht: kurze Anleitung fuer Folgeprojekte, wie
-% man die Loesung zum Laufen bekommt. Bewusst knapp halten (1-2 Seiten) --
-% Verweis auf README/Repo fuer Details, hier nur der rote Faden.
+
+Dieses Kapitel beschreibt die grundlegenden Schritte zur Inbetriebnahme von
+WikiPod. Die Anleitung ist insbesondere als Einstiegspunkt für Folgeprojekte
+gedacht. Weiterführende Informationen zur Projektstruktur und zu einzelnen
+Komponenten befinden sich in der README-Datei des Repositorys.
 
 \section{Voraussetzungen}
-% Python-Version, Docker, ggf. Ollama/llama-cpp-python, Hardware-Hinweise.
+
+Für die lokale Ausführung wird eine Python-Umgebung sowie Docker mit Docker
+Compose benötigt. Die Anwendung verwendet OpenSearch für die Speicherung und
+Abfrage der erzeugten Vektorrepräsentationen. Für die Dokumentengrundlage wird
+außerdem eine lokale Wikipedia-ZIM-Datei benötigt. Diese ist aufgrund ihrer
+Größe nicht Bestandteil des Repositorys und muss separat bereitgestellt werden.
+
+Für den produktionsnahen Betrieb wurde im Projekt ein Raspberry Pi~5 mit
+16\,GB Arbeitsspeicher und einer 1-TB-SSD verwendet. Die grundlegenden
+Entwicklungs- und Testschritte können jedoch auch auf einem gewöhnlichen
+Entwicklungsrechner durchgeführt werden.
 
 \section{Installation}
+
+Nach dem Klonen des Repositorys wird zunächst eine virtuelle Python-Umgebung
+erstellt und anschließend das Projekt einschließlich der
+Entwicklungsabhängigkeiten installiert.
+
 \begin{lstlisting}[language=bash]
-git clone <repo-url>
+git clone <https://github.com/niklasbelieres/wikipod-rag>
 cd wikipod-rag
+
+python -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 \end{lstlisting}
 
+Anschließend muss eine Wikipedia-ZIM-Datei lokal bereitgestellt werden. Der
+Pfad zu dieser Datei wird über den Eintrag \texttt{source.zim\_file} in der
+jeweiligen Konfigurationsdatei festgelegt.
+
 \section{Lokales Setup (Entwicklung)}
+
+OpenSearch wird lokal über Docker Compose gestartet:
+
 \begin{lstlisting}[language=bash]
-docker compose up -d          % OpenSearch lokal starten
-wikipod index                 % Testkorpus indexieren
-wikipod query "..."           % Beispiel-Anfrage
+docker compose up -d
+\end{lstlisting}
+
+Ob OpenSearch erreichbar ist, kann anschließend beispielsweise mit folgendem
+Aufruf geprüft werden:
+
+\begin{lstlisting}[language=bash]
+curl http://localhost:9200
+\end{lstlisting}
+
+Wenn die konfigurierte ZIM-Datei vorhanden und OpenSearch gestartet ist, kann
+die Indexierung im Entwicklungsmodus ausgeführt werden:
+
+\begin{lstlisting}[language=bash]
+WIKIPOD_ENV=dev python -m wikipod.cli index
+\end{lstlisting}
+
+Nach erfolgreicher Indexierung kann eine Anfrage an das System gestellt werden:
+
+\begin{lstlisting}[language=bash]
+WIKIPOD_ENV=dev python -m wikipod.cli query \
+  "What is the Catholic Church?"
+\end{lstlisting}
+
+Soll ausschließlich das Retrieval untersucht werden, ohne eine Antwort durch
+das lokale Sprachmodell zu erzeugen, kann die Option
+\texttt{--chunks-only} verwendet werden:
+
+\begin{lstlisting}[language=bash]
+WIKIPOD_ENV=dev python -m wikipod.cli query \
+  --chunks-only "What is the Catholic Church?"
 \end{lstlisting}
 
 \section{Konfiguration}
-% Kurzer Verweis auf config/default.yaml + Environment-Overlays
-% (dev/prod/pi-test), WIKIPOD\_ENV-Variable.
+
+Die Konfiguration des Systems befindet sich im Verzeichnis
+\texttt{config/}. Unterschiedliche Konfigurationen werden für Entwicklung,
+Evaluation, Tests auf dem Raspberry Pi und den produktionsnahen Betrieb
+verwendet. Über die Umgebungsvariable \texttt{WIKIPOD\_ENV} kann die jeweils
+benötigte Laufzeitkonfiguration ausgewählt werden. Wird keine Umgebung
+angegeben, verwendet WikiPod standardmäßig die Entwicklungsumgebung
+\texttt{dev}.
+
+Insbesondere muss der Pfad zur verwendeten Wikipedia-ZIM-Datei über
+\texttt{source.zim\_file} an die lokale Umgebung angepasst werden. Dadurch
+können unterschiedliche Datensätze und Laufzeitumgebungen verwendet werden,
+ohne die allgemeine Projektkonfiguration für jeden Versuch verändern zu
+müssen.
 
 \section{Deployment auf dem Raspberry Pi}
-% Kurzfassung aus Kapitel 6: ZIM-Datei platzieren, prod.yaml anpassen,
-% Docker/OpenSearch-Heap-Groesse, ggf. Hinweis auf Build/Serve-Trennung.
 
-\section{Evaluation ausfuehren}
+Für den Betrieb auf dem Raspberry Pi wird das Repository zunächst auf das
+Gerät übertragen und analog zur lokalen Installation eingerichtet. Die
+Wikipedia-ZIM-Datei muss auf dem lokalen Speichermedium des Raspberry Pi
+vorliegen und der entsprechende Pfad in der dafür vorgesehenen
+Konfiguration eingetragen werden.
+
+OpenSearch wird auch auf dem Raspberry Pi über Docker Compose betrieben.
+Nach dem Start von OpenSearch kann die Indexierung mit der für den jeweiligen
+Versuch vorgesehenen Konfiguration ausgeführt werden. Für Pi-spezifische
+Testläufe steht beispielsweise die Konfiguration
+\texttt{config/pi-test.yaml} zur Verfügung. Dadurch können Experimente auf dem
+Raspberry Pi durchgeführt werden, ohne die Standardkonfiguration für die
+Entwicklung zu verändern.
+
+Bei längeren Indexierungsläufen kann zusätzlich das im Projekt enthaltene
+Monitoring gestartet werden:
+
 \begin{lstlisting}[language=bash]
-wikipod evaluate --dataset test/data/eval_queries.yaml
+python -m wikipod.scripts.monitor_run \
+  --out logs/pi_top100_index.csv \
+  --interval 10
 \end{lstlisting}
+
+Das Monitoring zeichnet unter anderem CPU-, Speicher-, Swap- und
+Temperaturwerte sowie den Speicherverbrauch von WikiPod und OpenSearch auf.
+Nach Abschluss des Laufs kann das Monitoring mit \texttt{Ctrl+C} beendet und
+die erzeugte CSV-Datei ausgewertet werden:
+
+\begin{lstlisting}[language=bash]
+python -m wikipod.scripts.plot_metrics \
+  logs/pi_top100_index.csv
+\end{lstlisting}
+
+\section{Evaluation ausführen}
+
+Für die Retrieval-Evaluation steht das Kommando \texttt{evaluate} zur
+Verfügung. Als Eingabe wird ein YAML- oder JSON-Datensatz mit
+natürlichsprachlichen Anfragen und den jeweils relevanten Wikipedia-Artikeln
+verwendet.
+
+Für die im Bericht eingesetzte Evaluationskonfiguration kann beispielsweise
+folgender Aufruf ausgeführt werden:
+
+\begin{lstlisting}[language=bash]
+WIKIPOD_ENV=report_eval python -m wikipod.cli evaluate \
+  --dataset test/data/eval_queries.yaml
+\end{lstlisting}
+
+Die Anzahl der betrachteten Retrieval-Ergebnisse kann bei Bedarf mit
+\texttt{--top-k} überschrieben werden. Ergebnisse lassen sich außerdem als
+JSON oder CSV beziehungsweise gesammelt in einem Ausgabeverzeichnis speichern:
+
+\begin{lstlisting}[language=bash]
+WIKIPOD_ENV=report_eval python -m wikipod.cli evaluate \
+  --dataset test/data/eval_queries.yaml \
+  --top-k 5 \
+  --output-dir logs/report_eval_k5
+\end{lstlisting}
+
+Optional können mit \texttt{--use-query-analyzer} die normalisierten Anfragen
+des Query Analyzers verwendet und mit \texttt{--use-llm-judge} zusätzliche
+LLM-basierte Bewertungen aktiviert werden.
+
+Vor einem neuen Lauf können die automatisierten Tests und die statische
+Codeprüfung ausgeführt werden:
+
+\begin{lstlisting}[language=bash]
+pytest
+ruff check .
+\end{lstlisting}
+
+Diese Prüfungen werden zusätzlich bei Pushes und Pull Requests auf den
+\texttt{main}-Branch über GitHub Actions ausgeführt.

@@ -52,7 +52,7 @@ parallel arbeitenden Worker-Prozesse selbst. Selbst auf einem Server mit rund 75
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.9\textwidth]{swap_vergleich.pdf}
+    \includegraphics[width=0.9\textwidth]{images/swap_vergleich.png}
     \caption{Swap-Auslastung bei zwei der drei Indexierungsversuche auf dem Raspberry Pi: Iteration~1 mit allmählichem Anstieg über rund 85 Minuten, Iteration~3 mit langer stabiler Phase (ca. 8 Stunden) und anschließendem abrupten Kollaps.}
     \label{fig:swap-vergleich}
 \end{figure}
@@ -76,7 +76,8 @@ lediglich, dass die Indexierung selbst auf dem Server erfolgte, nicht mit welche
 
 \section{Monitoring-Infrastruktur}
 
-Für die in Abschnitt~\ref{sec:speicherbedarf} beschriebenen Läufe wurde der Ressourcenverbrauch über \texttt{monitor\_run.py} aufgezeichnet. 
+Die in Abschnitt~\ref{sec:speicherbedarf} beschriebenen Läufe wurden mit dem
+Monitoring-Skript \texttt{monitor\_run.py} aufgezeichnet.
 Das Skript tastet in einem konfigurierbaren Intervall (Standard: 10 Sekunden) Systemmetriken ab und schreibt sie als CSV-Zeile fort, während 
 der eigentliche Indexierungslauf in einem separaten Prozess läuft.
 
