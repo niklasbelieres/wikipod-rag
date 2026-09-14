@@ -131,4 +131,15 @@ durch das Speicherbudget von Haus aus begrenzt, zweitens lief der eigentliche In
 bereitgestellten leistungsstärkeren Server.
 
 \section{Retrieval}
-% Query-Embedding + k-NN-Suche, Retriever-Klasse als Abstraktionsschicht.
+Die Klasse \texttt{Retriever} ermöglicht es, Query-Embedding und k-NN-Suche zu abstrahieren. Die zentrale Methode
+\texttt{retrieve(query, k)} kapselt diese Logik und gibt zu einem Anfrage-String die Top-k Chunks zurück, wodurch die
+OpenSearch-spezifische Antwortstruktur nach außen verborgen bleibt.
+
+Konkret wird in \texttt{retrieve(query, k)} zunächst der Anfragestring, mit der selben Embedder-Instanz wie beim Indexieren, vektorisiert. Im
+zweiten Schritt wird dann eine k-NN-Suche gegen den in~\ref{sec:opensearch-index-design} beschriebenen Index ausgeführt. Die Suche selbst liefert
+dabei bereits genau k Treffer, welche zur weiteren Verarbeitung in Chunk-Objekte transformiert und schließlich zurückgegeben werden.
+
+Vorteil dieser Abstraktion ist die bereits erwähnte Kapselung des OpenSearch-spezifischen Antwortformats. Zusätzlich lässt sich durch die
+\texttt{--chunks-only}-Option im \texttt{query}-Kommando das Retrieval isoliert von der LLM-Generierung ausführen bzw. testen, denn hier werden
+direkt die Top-k Chunks ausgegeben. Genau diese Trennbarkeit ermöglicht es, eine separate Messung der Retrieval-Qualität in Kapitel~\ref{ch:evaluation}
+durchzuführen, welche isoliert von der Generierung des Sprachmodells stattfindet.

@@ -1,4 +1,4 @@
-\chapter{Deployment auf eingeschraenkter Hardware}
+\chapter{Deployment auf eingeschränkter Hardware}
 \label{ch:deployment}
 % Deckt Ziel 1 ab (Bereitstellung der Wikipedia-Kopie) und einen Teil von
 % Ziel 5 (Effizienz auf eingeschraenkter Hardware). Hier gehoert die
@@ -6,30 +6,95 @@
 % Kapitel, da echte Systems-Engineering-Arbeit dahintersteckt.
 
 \section{Zielhardware}
-% Raspberry Pi 5, 16 GB RAM, 1 TB SSD -- kurz die Rahmenbedingungen.
+Für den finalen Betrieb der Pipeline ist ein Raspberry PI vorgesehen. Dieser verfügt über 16gb Arbeitsspeicher,
+und 1TB Hauptspeicher in Form einer SSD. Die Indexierung über dem gesamten englischen Wikipedia-Korpus wurde allerdings 
+nicht auf diesem, sondern auf einem leistungsstärkeren Server, welcher über rund 750gb RAM und 104 CPU-Kerne, durchgeführt.
+Die Gründe für diese Trennung werden in Abschnitt~\ref{sec:build-serve-split} erläutert.
 
-\section{Herausforderung: Speicherbedarf bei voller Korpusgroesse}
-% Die Eskalation in drei Stufen (siehe PI_SCALING_NOTES.md):
-%   1. Worker-lokale Akkumulation -> Batch-Groessen-Fix
-%   2. Volltext des gesamten Korpus im Hauptprozess -> Zwei-Pass-Metadaten
-%   3. Link-Listen selbst als Speicherfresser -> Interning + Streaming-Architektur
-% Fuer jede Stufe: Symptom (Swap/RAM-Metriken aus monitor_run.py), Diagnose,
-% Fix, Ergebnis. Plots aus dem Analyse-Notebook (notebooks/pi_run_analysis.ipynb)
-% hier einbinden -- Swap-Verlauf ueber die Versuche hinweg ist ein starkes Bild.
+\section{Herausforderung: Speicherbedarf bei voller Korpusgröße}
+\label{sec:speicherbedarf}
 
-% \begin{figure}[H]
-%     \centering
-%     \includegraphics[width=0.9\textwidth]{swap_vergleich.pdf}
-%     \caption{Swap-Auslastung ueber die drei Optimierungs-Iterationen}
-% \end{figure}
+Die ersten Versuche, den vollen englischsprachigen Wikipedia-Dump zu indexieren, liefen direkt auf dem Raspberry Pi. Alle im folgenden
+beschriebenen Probleme traten hierbei auf. Die Indexierung auf dem Server hingegen, welche wir aufgrund der Probleme ausgeführt haben,
+lief ohne auftreten von Problemen.
+
+Der erste Indexierungsversuche endete nach wenigen Stunden mit einem vollen Swap. Ursache hierfür war die Aufteilung der ZIM-Verarbeitung
+auf nur vier Worker-Bereiche. Dies führte bei rund 7 MIllionen Artikel dazu, dass jeder Worker etwa 1,75 Millionen Objekte gleichzeitig im
+Speicher hielt, bevor er sie am Ende zurückgab. Eine erste Maßnahme, kleinere Batches von 5000 Artikeln zu nutzen verringerte den
+Speicherbedarf pro Worker, löste das Problem allerdings nur teilweise, da der nächste Lauf nach elf Stunden erneut mit vollem Swap endete.
+
+Durch den zweiten Lauf ist uns die eigentliche Ursache, dass \texttt{extract\_metadata()} für jeden Artikel den vollständigen Abschnittstext 
+aufbaut, bewusst geworden. Bei einem geschätzten Speicherbedarf von 3-5KB Text pro Artikel sind das hochgerechnet 25-35GB für den Artikeltext,
+was die Speicherkapazität von 16GB auf dem Raspberry PI deutlich überschreitet. Für die reine Selektion der Artikel wird er Volltext allerdings
+nicht benötigt, da diese nur von Metadaten, wie beispielsweise \texttt{link\_count} oder \texttt{word\_count} abhängt. Daher sind wir zu dem 
+Entschluss gekommen, diesen Teil der Pipeline in zwei Abschnitte aufzuteilen: der erste Durchgang über den ganzen 
+Korpus läuft mit \texttt{include\_sections=False} und verwirft den Volltext sofort wieder, der zweite Durchgang lädt ihn gezielt nur 
+für die am Ende ausgewählte, deutlich kleinere Teilmenge nach.
+
+Auch nach diesem Fix bestand das Speicherproblem weiter: Ein dritter Lauf endete erneut mit vollem Swap, diesmal mit einem noch höheren Speicherbedarf 
+als beim reinen Batch-Fix, obwohl der Volltext zu diesem Zeitpunkt bereits nicht mehr gehalten wurde. Ursache waren die Link-Listen selbst: Der 
+\texttt{importance}-Score in \texttt{score\_article()} benötigt für jeden Artikel die Rohliste seiner ausgehenden Links, nicht nur die aggregierte 
+\texttt{link\_frequenc\_map}. Bei geschätzt 20--75 Links pro Artikel und dem Speicher-Overhead einzelner Python-Strings ergaben sich dadurch zusätzlich 8--30~GB allein für 
+Linklisten. Ein erster Lösungsversuch über String-Interning reduzierte Duplikate zwar innerhalb eines einzelnen Worker-Prozesses, ging aber beim Rücktransport der 
+Ergebnisse in den Hauptprozess (Pickle-Serialisierung) wieder verloren, da jeder Prozess seine eigene Intern-Tabelle führt. Die eigentliche Ursache lag jedoch tiefer: 
+\texttt{select\_within\_budget()} hielt weiterhin sämtliche Artikel-Objekte des gesamten Korpus gleichzeitig in einer Liste, um sie zu sortieren. Erst der 
+Umbau auf eine Zwei-Pass-Streaming-Architektur mit einem JSONL-Cache auf der Festplatte behob das Problem strukturell: Der erste Durchgang baut die Link-Frequency-Map 
+auf und schreibt dabei jeden Artikel als JSONL-Zeile mit. Der zweite Durchgang liest von dort zurück und verwirft nach dem Scoring jedes Artikels dessen Links unmittelbar wieder. 
+Dadurch befindet sich im Hauptprozess zu keinem Zeitpunkt mehr als ein Artikel mit vollständigen Links gleichzeitig im Speicher.
+
+Der reale Lauf über den vollen Korpus (7.322.195 Artikel) fand auf dem in Abschnitt~\ref{sec:build-serve-split} beschriebenen Server statt, nicht auf dem Pi. Die Messung bestätigt, 
+dass der Hauptprozess dabei tatsächlich schlank bleibt: Der Swap-Speicher blieb über die gesamte Laufzeit von 162 Minuten bei 0, und nach etwa 20 Minuten sank der WikiPod-Speicherbedarf 
+auf ein stabiles Niveau von 20--40~GB für den Rest des Laufs. In genau diesem ersten Zeitfenster zeigt die Messung jedoch einen deutlichen Ausschlag: Der über alle 
+\texttt{wikipod}-Prozesse aufsummierte RSS-Wert erreicht kurzzeitig rund 434~GB. Zeitlich fällt dies mit dem ersten Durchgang zusammen, in dem mehrere Worker-Prozesse parallel die 
+ZIM-Datei parsen. Da der Lauf selbst keine Zeitstempel pro Verarbeitungsschritt protokolliert, lässt sich dieser Zusammenhang nicht belegen, sondern nur als naheliegende Interpretation 
+formulieren: Die Zwei-Pass-Architektur begrenzt zuverlässig die über die Zeit im Hauptprozess akkumulierte Speichermenge, trifft aber keine Aussage über den kombinierten Speicherbedarf der
+parallel arbeitenden Worker-Prozesse selbst. Selbst auf einem Server mit rund 755~GB RAM entsprach dieser kurzfristig mehr als der Hälfte des verfügbaren Speichers.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{swap_vergleich.pdf}
+    \caption{Swap-Auslastung bei zwei der drei Indexierungsversuche auf dem Raspberry Pi: Iteration~1 mit allmählichem Anstieg über rund 85 Minuten, Iteration~3 mit langer stabiler Phase (ca. 8 Stunden) und anschließendem abrupten Kollaps.}
+    \label{fig:swap-vergleich}
+\end{figure}
 
 \section{Entscheidung: Trennung von Build- und Serve-Phase}
-% Begruendung, warum die Indexierung des vollen Dumps auf leistungsstaerkerer
-% Hardware sinnvoll und mit der Aufgabenstellung vereinbar ist (die
-% Aufgabenstellung verlangt ein auf dem Pi lauffaehiges *Ergebnis*, nicht
-% zwingend einen auf dem Pi laufenden Build-Prozess). Mechanik: Snapshot/
-% Restore zwischen Build-Server und Pi.
+\label{sec:build-serve-split}
+
+Die Aufgabenstellung verlangt, dass die fertige Lösung auf dem Pi läuft, nicht zwingend, dass der Pi den Indexierungsprozess selbst durchführt. Diese Unterscheidung ist der eigentliche Grund, 
+warum die in Abschnitt~\ref{sec:speicherbedarf} beschriebenen Speicherprobleme am Ende kein Blocker blieben: Sie mussten nicht auf dem Pi gelöst werden, sondern nur so weit, dass 
+irgendeine verfügbare Hardware den vollen Korpus verarbeiten kann.
+
+Der volle englischsprachige Wikipedia-Dump wird deshalb nicht auf dem Pi, sondern auf einem eigens dafür angefragten, deutlich leistungsfähigeren Server indexiert 
+(104 CPU-Kerne, rund 755~GB RAM). Der fertige OpenSearch-Index wird anschließend per Snapshot vom Server auf den Pi übertragen, über denselben \texttt{path.repo}-Mechanismus, der 
+bereits in Abschnitt~\ref{sec:opensearch-index-design} beschrieben wurde. Auf dem Pi selbst muss folglich nur noch der bereits fertige Index eingespielt und für Anfragen bereitgestellt 
+werden; die rechenintensive Aufbauphase entfällt dort vollständig.
+
+Angefragt wurde der Server erst, nachdem die in Abschnitt~\ref{sec:speicherbedarf} beschriebenen Läufe auf dem Pi wiederholt im vollen Swap endeten. 
+Mit welcher genauen OpenSearch-Konfiguration (Heap-Größe, Ressourcen-Limits) der Index letztlich auf dem Pi betrieben wird, lässt sich aus dem aktuellen 
+Repository-Stand nicht ablesen: Das lokale \texttt{docker-compose.yml} deckt nachweislich nur den Entwicklungsaufbau ab, nicht den tatsächlichen Pi-Betrieb. Bekannt ist 
+lediglich, dass die Indexierung selbst auf dem Server erfolgte, nicht mit welchen exakten Parametern der Pi den übertragenen Index anschließend bedient.
 
 \section{Monitoring-Infrastruktur}
-% Kurz: monitor\_run.py (Load/RAM/Swap/Temperatur/Throttling), warum
-% stdlib-only (kein zusaetzlicher Install-Schritt auf dem Pi noetig).
+
+Für die in Abschnitt~\ref{sec:speicherbedarf} beschriebenen Läufe wurde der Ressourcenverbrauch über \texttt{monitor\_run.py} aufgezeichnet. 
+Das Skript tastet in einem konfigurierbaren Intervall (Standard: 10 Sekunden) Systemmetriken ab und schreibt sie als CSV-Zeile fort, während 
+der eigentliche Indexierungslauf in einem separaten Prozess läuft.
+
+Bewusst stdlib-only: Das Skript liest direkt aus \texttt{/proc/meminfo} und \texttt{/proc/vmstat} statt eine Bibliothek wie \texttt{psutil} 
+einzubinden, und lässt sich unabhängig vom \texttt{wikipod}-Package installieren beziehungsweise ausführen. Dadurch ist kein zusätzlicher 
+Installationsschritt auf dem Pi nötig, und es entsteht kein Konfliktrisiko mit der virtuellen Umgebung, die für den eigentlichen Indexierungslauf 
+genutzt wird.
+
+Erfasst werden pro Zeitpunkt: Load Average über 1 und 5 Minuten, eine daraus abgeleitete CPU-Auslastung (Load im Verhältnis zur Kernzahl), 
+Gesamt- und verfügbarer Arbeitsspeicher, die aufsummierte RSS aller Prozesse, deren Kommandozeile \texttt{wikipod} beziehungsweise 
+\texttt{opensearch} enthält, sowie belegter und verfügbarer Swap-Speicher inklusive Swap-In/Out-Seiten. Auf dem Pi kommen CPU-Temperatur 
+und Throttling-Status über \texttt{vcgencmd} hinzu; auf anderen Systemen liefert derselbe Aufruf kontrolliert \texttt{None} zurück, statt 
+das Skript abzubrechen.
+
+Ein praktisches Detail betrifft die Ausgabe: Ein erneuter Aufruf mit demselben \texttt{--out}-Pfad hängt an die bestehende CSV an, 
+statt sie zu überschreiben. Ein Neustart des Monitors nach einem Absturz verliert dadurch keine bereits aufgezeichneten Samples — genau das erklärt 
+auch, warum sich in einigen der aufgezeichneten Läufe (Abschnitt~\ref{sec:speicherbedarf}) bereits zu Beginn ein teilweise gefüllter Swap-Speicher 
+zeigt, wenn zwischen zwei Versuchen kein Neustart des Systems selbst erfolgte.
+
+Als Auswertungsgegenstück liest \texttt{plot\_metrics.py} eine solche CSV ein und erzeugt daraus sowohl Kennzahlen (Spitzenwerte, Laufzeit) als 
+auch die in diesem Kapitel verwendeten Diagramme.
