@@ -1,13 +1,7 @@
 \chapter{Diskussion}
 \label{ch:diskussion}
-% Reflektierender Teil -- oft unterschaetzt, aber genau das, was einen
-% guten von einem rein beschreibenden Bericht unterscheidet.
 
 \section{Herausforderungen}
-% Die Speicher-Eskalation (Kap. 6) als zentrales Beispiel: naheliegende
-% Erstdiagnosen trafen jeweils einen echten, aber nicht dominanten Faktor --
-% erst die Frage "wie viele Objekte leben gleichzeitig" fuehrte zur Loesung.
-% Das ist eine uebertragbare Erkenntnis, nicht nur eine Randnotiz.
 Eine zentrale Herausforderung bei der Verarbeitung des vollständigen
 Wikipedia-Korpus war der stark ansteigende Speicherbedarf. Während die
 Verarbeitung kleinerer Datenmengen zunächst unauffällig verlief, zeigte sich
@@ -37,10 +31,7 @@ Zwischenergebnisse möglichst früh weiterverarbeitet beziehungsweise
 persistiert werden, anstatt sie über den gesamten Verarbeitungslauf im
 Arbeitsspeicher zu halten.
 
-\section{Designentscheidungen im Rueckblick}
-% Was wuerdet ihr nochmal genauso machen, was anders (z. B. frueher auf
-% Streaming-Architektur setzen statt erst bei vollem Korpus zu merken,
-% dass In-Memory-Ansaetze nicht skalieren).
+\section{Designentscheidungen im Rückblick}
 
 Ein konkreter Punkt, den wir im Rückblick anders angehen würden, betrifft die Gewichtung des Scoring-Modells
 aus Abschnitt~\ref{ch:dokumentenauswahl}. Die Messung auf dem vollen en.wikipedia-Korpus (Tabelle~\ref{tab:scoring-weights})
@@ -54,16 +45,14 @@ Auswahl wider, obwohl genau das mit \texttt{config/prod.yaml} beziehungsweise \t
 beabsichtigt war.
 
 Für eine zukünftige Iteration wären zwei Ansätze naheliegend: entweder \texttt{importance} durch die Anzahl
-der berücksichtigten Links zu normalisieren (Mittelwert statt Summe der gedämpften Linkfrequenzen), oder alle
+der berücksichtigten Links zu normalisieren (Mittelwert statt Summe der gedämpften Linkfrequenzen) oder alle
 fünf Rohsignale vor der Gewichtung zusätzlich zu standardisieren (z.\,B. per Z-Score relativ zu ihrer eigenen
 Verteilung im Korpus), sodass ein konfiguriertes Gewicht tatsächlich einen vergleichbaren Anteil am Endscore
 bewirkt -- unabhängig von der ursprünglichen Skala des jeweiligen Signals. Beide Änderungen hätten jedoch
 Rückwirkungen auf die bereits durchgeführten Selektionsläufe und wurden im Rahmen dieses Projekts aus
 Zeitgründen nicht mehr umgesetzt.
 
-\section{Grenzen der Loesung}
-% Was deckt das System bewusst nicht ab (z. B. nur englische Wikipedia,
-% keine Multi-Turn-Konversation, Kategorien-Signal nicht genutzt, ...).
+\section{Grenzen der Lösung}
 
 Die entwickelte Lösung unterliegt mehreren Einschränkungen, die bei der
 Einordnung der Ergebnisse berücksichtigt werden müssen. Eine grundlegende

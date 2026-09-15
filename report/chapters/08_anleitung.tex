@@ -108,6 +108,8 @@ Testläufe steht beispielsweise die Konfiguration
 Raspberry Pi durchgeführt werden, ohne die Standardkonfiguration für die
 Entwicklung zu verändern.
 
+\par\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
 Bei längeren Indexierungsläufen kann zusätzlich das im Projekt enthaltene
 Monitoring gestartet werden:
 
@@ -116,6 +118,7 @@ python -m wikipod.scripts.monitor_run \
   --out logs/pi_top100_index.csv \
   --interval 10
 \end{lstlisting}
+\end{minipage}\par\smallskip
 
 Das Monitoring zeichnet unter anderem CPU-, Speicher-, Swap- und
 Temperaturwerte sowie den Speicherverbrauch von WikiPod und OpenSearch auf.

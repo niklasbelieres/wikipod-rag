@@ -1,15 +1,12 @@
 \chapter{Vektorindexierung mit OpenSearch}
 \label{ch:indexierung}
-% Deckt Ziel 3 ab: "Indexierung der ausgewaehlten Teilmenge als dichte
-% Vektoren mittels OpenSearch".
 
 Damit die im vorherigen Pipeline-Schritt ausgewählte Wikipedia-Teilmenge von einem Large-Language-Modell genutzt
 werden kann, müssen diese Artikel zunächst in geeignete Textabschnitte (Chunks) unterteilt werden, bevor diese
 als dichte Vektoren indexiert werden können. Die Aufteilung ermöglicht eine granularere Suche nach relevanten
 Informationen, da bei einer Anfrage nicht zwangsläufig ein vollständiger Wikipedia-Artikel, sondern gezielt
 relevante Textpassagen als Kontext für das Large-Language-Modell abgerufen werden können. Die Verwendung von
-Textpassagen als Retrieval-Einheiten stellt dabei einen etablierten Ansatz im Dense Retrieval dar
-~\cite{karpukhin-etal-2020-dense}.
+Textpassagen als Retrieval-Einheiten stellt dabei einen etablierten Ansatz im Dense Retrieval dar~\cite{karpukhin-etal-2020-dense}.
 
 \section{Chunking-Strategie}
 \label{sec:chunking-strategie}
@@ -24,8 +21,7 @@ Innerhalb eines Abschnitts werden die Texte mit einer maximalen Fenstergröße v
 Überlappung von 40 Wörtern unterteilt. Die Wahl der Chunk-Größe stellt einen Kompromiss zwischen der
 Granularität des Retrievals und dem Erhalt ausreichenden Kontextes dar. Untersuchungen zeigen, dass die
 optimale Chunk-Größe von der Charakteristik der Daten, der konkreten Retrieval-Aufgabe und dem verwendeten
-Embedding-Modell abhängt und daher nicht allgemein festgelegt werden kann
-~\cite{bhat2025rethinkingchunksizelongdocument}. Die für dieses Projekt verwendete Fenstergröße wurde
+Embedding-Modell abhängt und daher nicht allgemein festgelegt werden kann~\cite{bhat2025rethinkingchunksizelongdocument}. Die für dieses Projekt verwendete Fenstergröße wurde
 daher als geeigneter Kompromiss für den verwendeten Wikipedia-Korpus und das nachfolgende Retrieval
 festgelegt.
 
@@ -51,12 +47,10 @@ CPU-only-Hardware ausgeführt werden muss. Das Modell \texttt{all-MiniLM-L6-v2} 
 Kompromiss zwischen Modellgröße und Embedding-Qualität dar.
 
 Das Modell wurde auf über 1,17~Milliarden Satzpaaren aus unterschiedlichen Quellen trainiert und ist unter
-anderem für Information-Retrieval-, Clustering- und Sentence-Similarity-Aufgaben vorgesehen
-~\cite{minilm-model-card}. Damit ist es für den im Projekt verfolgten Anwendungsfall des semantischen
+anderem für Information-Retrieval-, Clustering- und Sentence-Similarity-Aufgaben vorgesehen~\cite{minilm-model-card}. Damit ist es für den im Projekt verfolgten Anwendungsfall des semantischen
 Retrievals geeignet.
 
-Eine weitere relevante Einschränkung des Modells ist die maximale Eingabelänge von 256 Word Pieces
-~\cite{minilm-model-card}. Da die Chunk-Größe anhand von Wörtern festgelegt wird, kann daraus jedoch nicht
+Eine weitere relevante Einschränkung des Modells ist die maximale Eingabelänge von 256 Word Pieces~\cite{minilm-model-card}. Da die Chunk-Größe anhand von Wörtern festgelegt wird, kann daraus jedoch nicht
 direkt abgeleitet werden, dass jeder Chunk diese Grenze unterschreitet, da ein Wort in mehrere Word Pieces
 zerlegt werden kann. Die tatsächliche Eingabelänge wird daher durch das verwendete Tokenisierungsverfahren
 begrenzt.
@@ -88,21 +82,21 @@ Anfragebearbeitung ausmacht. Eine entsprechende Messung direkt auf dem Raspberry
 \section{OpenSearch-Index-Design}
 \label{sec:opensearch-index-design}
 Für die Vektorsuche wird ein Feld vom Typ \texttt{knn\_vector} mit der Methode \texttt{hnsw} verwendet.
-Der Grund für ein approximatives statt eines exakten k-NN-Verfahrens liegt in der Skalierbarkeit: Laut der OpenSearch-Dokumentation 
-berechnet exaktes k-NN die Distanz per Brute-Force zwischen der Anfrage und allen Punkten, was bei 
+Der Grund für ein approximatives statt eines exakten $k$-NN-Verfahrens liegt in der Skalierbarkeit: Laut der OpenSearch-Dokumentation
+berechnet exaktes $k$-NN die Distanz per Brute-Force zwischen der Anfrage und allen Punkten, was bei
 \enquote{extremely large datasets with high dimensionality \ldots\ a scaling problem that reduces the efficiency of the search} erzeugt. 
 Approximative Verfahren \enquote{overcome this by employing tools that restructure indexes more efficiently 
 \ldots\ requir[ing] a sacrifice in accuracy but increas[ing] search processing speeds appreciably}~\cite{opensearch-approximate-knn}.
 
 Dieser Trade-off zulasten der Genauigkeit ist in unserem Anwendungsfall jedoch sinnvoll, da laut Dokumentation approximatives 
-k-NN \enquote{the preferred method \ldots\ when a dataset reaches hundreds of thousands of vectors} darstellt~\cite{opensearch-approximate-knn}.
+$k$-NN \enquote{the preferred method \ldots\ when a dataset reaches hundreds of thousands of vectors} darstellt~\cite{opensearch-approximate-knn}.
 
 Als \texttt{space\_type} wird \texttt{cosinesimil} verwendet, definiert als 
-$d(x,y) = 1-\cos\theta = 1 - \frac{x\cdot y}{|x|\cdot|y|}$ ~\cite{opensearch-spaces}. Da die im Embedding-Schritt (Abschnitt~\ref{sec:embedding-modell}) 
-erzeugten Vektoren bereits L2-normalisiert sind ($|x|=|y|=1$), reduziert sich diese Distanzfunktion auf ein einfaches Skalarprodukt
+$d(x,y) = 1-\cos\theta = 1 - \frac{x\cdot y}{|x|\cdot|y|}$~\cite{opensearch-spaces}. Da die im Embedding-Schritt (Abschnitt~\ref{sec:embedding-modell})
+erzeugten Vektoren bereits L2-normalisiert sind ($|x|=|y|=1$), reduziert sich diese Distanzfunktion auf ein einfaches Skalarprodukt.
 
 Die HNSW-Parameter \texttt{ef\_construction} und \texttt{m} werden im Mapping nicht explizit gesetzt und laufen damit auf den \texttt{nmslib}-Standardwerten
-$\texttt{ef\_construction}=100$, $m=16$ ~\cite{opensearch-methods-engines}. Höhere Werte würden laut Dokumentation einen genaueren Graphen bei langsamerer 
+$\texttt{ef\_construction}=100$, $m=16$~\cite{opensearch-methods-engines}. Höhere Werte würden laut Dokumentation einen genaueren Graphen bei langsamerer
 Indexierungsgeschwindigkeit (\texttt{ef\_construction}) bzw. höherem Speicherverbrauch ($m$) erkaufen. 
 
 Für den Bulk-Indexiervorgang (\texttt{index\_chunks()}) wird die deterministische
@@ -123,7 +117,7 @@ auf das konfigurierte Speicherbudget reduzierte Teilmenge. Die aufwendige Zwei-P
 Chunking, Embedding und Indexierung laufen über eine von vornherein kleinere, budgetbeschränkte Artikelmenge.
 
 Im \texttt{index}-Kommando der CLI wird die Chunk-Liste für diese gesamte ausgewählte Teilmenge auf einmal aufgebaut, statt gestreamt zu werden. Erst 
-Embedding und Indexierung selbst laufen anschließend batchweise (in Schritten von \texttt{config.embeddings.batch\_size}, standardmäßig 32): pro 
+Embedding und Indexierung selbst laufen anschließend batchweise (in Schritten von \texttt{config.embeddings.batch\_size}, standardmäßig 32): Pro
 Durchlauf werden nur die Vektoren eines Batches berechnet und indexiert, nie die aller Chunks gleichzeitig.
 
 Dass die vollständig im Speicher gehaltene Chunk-Liste hier kein Problem darstellte, hat vor allem zwei Gründe: erstens ist die Teilmenge 
@@ -131,15 +125,15 @@ durch das Speicherbudget von Haus aus begrenzt, zweitens lief der eigentliche In
 bereitgestellten leistungsstärkeren Server.
 
 \section{Retrieval}
-Die Klasse \texttt{Retriever} ermöglicht es, Query-Embedding und k-NN-Suche zu abstrahieren. Die zentrale Methode
-\texttt{retrieve(query, k)} kapselt diese Logik und gibt zu einem Anfrage-String die Top-k Chunks zurück, wodurch die
+Die Klasse \texttt{Retriever} ermöglicht es, Query-Embedding und $k$-NN-Suche zu abstrahieren. Die zentrale Methode
+\texttt{retrieve(query, k)} kapselt diese Logik und gibt zu einem Anfrage-String die Top-$k$-Chunks zurück, wodurch die
 OpenSearch-spezifische Antwortstruktur nach außen verborgen bleibt.
 
-Konkret wird in \texttt{retrieve(query, k)} zunächst der Anfragestring, mit der selben Embedder-Instanz wie beim Indexieren, vektorisiert. Im
-zweiten Schritt wird dann eine k-NN-Suche gegen den in~\ref{sec:opensearch-index-design} beschriebenen Index ausgeführt. Die Suche selbst liefert
-dabei bereits genau k Treffer, welche zur weiteren Verarbeitung in Chunk-Objekte transformiert und schließlich zurückgegeben werden.
+Konkret wird in \texttt{retrieve(query, k)} zunächst der Anfragestring mit derselben Embedder-Instanz wie beim Indexieren vektorisiert. Im
+zweiten Schritt wird dann eine $k$-NN-Suche gegen den in~\ref{sec:opensearch-index-design} beschriebenen Index ausgeführt. Die Suche selbst liefert
+dabei bereits genau $k$ Treffer, welche zur weiteren Verarbeitung in Chunk-Objekte transformiert und schließlich zurückgegeben werden.
 
 Vorteil dieser Abstraktion ist die bereits erwähnte Kapselung des OpenSearch-spezifischen Antwortformats. Zusätzlich lässt sich durch die
 \texttt{--chunks-only}-Option im \texttt{query}-Kommando das Retrieval isoliert von der LLM-Generierung ausführen bzw. testen, denn hier werden
-direkt die Top-k Chunks ausgegeben. Genau diese Trennbarkeit ermöglicht es, eine separate Messung der Retrieval-Qualität in Kapitel~\ref{ch:evaluation}
+direkt die Top-$k$-Chunks ausgegeben. Genau diese Trennbarkeit ermöglicht es, eine separate Messung der Retrieval-Qualität in Kapitel~\ref{ch:evaluation}
 durchzuführen, welche isoliert von der Generierung des Sprachmodells stattfindet.

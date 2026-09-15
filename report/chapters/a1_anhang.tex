@@ -1,8 +1,7 @@
 \chapter{Anhang}
 \label{ch:anhang}
 
-\section{Vollstaendige Konfigurationsdateien}
-% ggf. config/prod.yaml o.ae. als Listing, falls im Haupttext nur Auszuege stehen.
+\section{Vollständige Konfigurationsdateien}
 
 Die folgende Konfiguration entspricht der vorgesehenen
 Produktivkonfiguration für den Raspberry Pi~5 mit 16~GB Arbeitsspeicher
@@ -41,9 +40,6 @@ llm:
 \end{lstlisting}
 
 \section{CI/CD-Pipeline}
-% Kurzer Verweis + ggf. Listing von .github/workflows/ci.yaml, falls fuer
-% den Bericht relevant (Testabdeckung/Qualitaetssicherung als Teil des
-% "generelle Vorgehensweise"-Punkts aus der Aufgabenstellung).
 
 Zur automatisierten Qualitätssicherung wird GitHub Actions eingesetzt. Die
 CI-Pipeline wird sowohl bei Pushes auf den Branch \texttt{main} als auch bei
@@ -137,20 +133,18 @@ jobs:
         run: pytest
 \end{lstlisting}
 
-\section{Vollstaendige Eval-Ergebnisse}
-% Tabelle aller Eval-Queries mit Einzelwerten (recall\_at\_k, reciprocal\_rank),
-% falls das im Hauptteil nur aggregiert gezeigt wird.
+\section{Vollständige Eval-Ergebnisse}
 
 Die folgenden Tabellen zeigen die Einzelresultate der in
-Kapitel~\ref{ch:evaluation} beschriebenen Retrieval-Evaluation. Fuer den
-regulaeren Evaluationsdatensatz sind die Ergebnisse fuer $k=5$ dargestellt.
+Kapitel~\ref{ch:evaluation} beschriebenen Retrieval-Evaluation. Für den
+regulären Evaluationsdatensatz sind die Ergebnisse für $k=5$ dargestellt.
 Da bei $k=10$ dieselben relevanten Artikel mit denselben Rangpositionen
-gefunden wurden, bleiben Recall und Reciprocal Rank gegenueber $k=5$
-unveraendert. Lediglich die Precision sinkt aufgrund der groesseren Anzahl
+gefunden wurden, bleiben Recall und Reciprocal Rank gegenüber $k=5$
+unverändert. Lediglich die Precision sinkt aufgrund der größeren Anzahl
 betrachteter Ergebnisse von $0{,}2$ auf $0{,}1$.
 \small
-\begin{longtable}{@{}p{6.4cm}p{3.6cm}p{1.5cm}p{1cm}@{}}
-\caption{Einzelergebnisse des regulaeren Evaluationsdatensatzes bei $k=5$}
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{6.4cm}>{\raggedright\arraybackslash}p{3.6cm}p{1.5cm}p{1cm}@{}}
+\caption{Einzelergebnisse des regulären Evaluationsdatensatzes bei $k=5$}
 \label{tab:eval-einzel-regulaer}\\
 \toprule
 Anfrage & Ground Truth & Recall@5 & RR \\
@@ -268,4 +262,3 @@ markierte Einstein-Anfrage besitzt keinen relevanten Zieltitel im verwendeten
 Korpus und wird daher in beiden Läufen mit $RR=0$ ausgewiesen.
 
 \section{Weitere Diagramme}
-% Alles aus dem Analyse-Notebook, was im Haupttext keinen Platz hatte.

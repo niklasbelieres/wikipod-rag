@@ -11,9 +11,9 @@ Artikeln enthaltenen HTML-Dokumente werden mit \texttt{BeautifulSoup} verarbeite
 um Textinhalte und Metadaten zu extrahieren.
 
 Für die semantische Repräsentation der Textabschnitte wird die Bibliothek
-sentence-\allowbreak transformers verwendet. Die daraus erzeugten dichten Vektoren
+sentence-\allowbreak trans\-formers verwendet. Die daraus erzeugten dichten Vektoren
 werden gemeinsam mit den zugehörigen Metadaten in OpenSearch gespeichert und
-dort für das k-NN-basierte Retrieval genutzt. KIWIX beziehungsweise ZIM als
+dort für das $k$-NN-basierte Retrieval genutzt. KIWIX beziehungsweise ZIM als
 Datenformat und OpenSearch als Retrieval-System ergeben sich unmittelbar aus
 der Aufgabenstellung des Projekts.
 
@@ -25,7 +25,7 @@ verwendet werden. Die Kommandozeilenschnittstelle des Projekts ist mit
 Terminalausgaben. Konfigurationen werden mit \texttt{PyYAML} eingelesen und über
 \texttt{Pydantic}-Modelle validiert.
 
-\section{Pipeline-Ueberblick}
+\section{Pipeline-Überblick}
 
 Die Systemarchitektur von WikiPod lässt sich in zwei voneinander getrennte
 Phasen unterteilen: die Indexierungsphase und die Anfragephase.
@@ -89,43 +89,43 @@ lokalen Systemumgebung.
 
     % Indexierungsphase
     \node[box] (zim)
-        {Wikipedia-ZIM\\{\small Dump der Artikeldaten}};
+        {\textbf{Wikipedia-ZIM}\\{\small Dump der Artikeldaten}};
 
     \node[box, below=of zim] (metadata)
-        {Metadatenextraktion\\und JSONL-Cache};
+        {\textbf{Metadatenextraktion}\\und JSONL-Cache};
 
     \node[box, below=of metadata] (selection)
-        {Link-Frequenz-Map,\\Scoring und Auswahl};
+        {\textbf{Link-Frequenz-Map,}\\\textbf{Scoring und Auswahl}};
 
     \node[box, below=of selection] (fulltext)
-        {Volltext der ausgewählten\\Artikel laden};
+        {\textbf{Volltext der ausgewählten}\\\textbf{Artikel laden}};
 
     \node[box, below=of fulltext] (chunking)
-        {Chunking\\{\small Text in überlappende Abschnitte}};
+        {\textbf{Chunking}\\{\small Text in überlappende Abschnitte}};
 
     \node[box, below=of chunking] (embedding)
-        {Embedding der Chunks\\{\small Vektorrepräsentationen}};
+        {\textbf{Embedding der Chunks}\\{\small Vektorrepräsentationen}};
 
     % Anfragephase
     \node[box, right=8.2cm of zim] (query)
-        {Nutzeranfrage\\{\small natürliche Sprache}};
+        {\textbf{Nutzeranfrage}\\{\small natürliche Sprache}};
 
     \node[box, below=of query] (queryembed)
-        {Query-Embedding\\{\small Vektorrepräsentation}};
+        {\textbf{Query-Embedding}\\{\small Vektorrepräsentation}};
 
     \node[box, below=of queryembed] (retrieval)
-        {Dense Retrieval in OpenSearch\\
+        {\textbf{Dense Retrieval in OpenSearch}\\
         {\small ähnliche Chunks suchen}};
 
     \node[box, below=of retrieval] (prompt)
-        {Prompt-Konstruktion\\
+        {\textbf{Prompt-Konstruktion}\\
         {\small relevante Chunks + Anweisung}};
 
     \node[box, below=of prompt] (llm)
-        {Lokales Sprachmodell};
+        {\textbf{Lokales Sprachmodell}};
 
     \node[box, below=of llm] (answer)
-        {Antwort\\{\small natürliche Sprache}};
+        {\textbf{Antwort}\\{\small natürliche Sprache}};
 
     % Zentraler OpenSearch-Vektorindex
     \node[
@@ -133,8 +133,8 @@ lokalen Systemumgebung.
         right=10mm of embedding,
         yshift=9mm
     ] (opensearch)
-        {OpenSearch-\\
-        Vektorindex\\
+        {\textbf{OpenSearch-}\\
+        \textbf{Vektorindex}\\
         {\small Chunk-Embeddings\\und Metadaten}};
 
     % Phasenrahmen
@@ -212,13 +212,16 @@ einem durchgängigen Ablauf verbunden werden. Ergänzend enthält das Projekt
 separate Verzeichnisse für Konfigurationsdateien, Tests und den vorliegenden
 Bericht.
 
+\begingroup
+\emergencystretch=1em
 Ein zentraler Bestandteil der Projektstruktur ist die konfigurationsbasierte
 Steuerung des Systems. Allgemeine Standardwerte werden in
 \texttt{config/default.yaml} definiert und können durch umgebungsspezifische
 Konfigurationsdateien überschrieben werden. Dadurch lassen sich beispielsweise
 Entwicklungs-, Test- und produktive Indexierungsläufe mit unterschiedlichen
 Ressourcenbudgets und Parametern durchführen, ohne dafür Änderungen am
-Programmcode vornehmen zu müssen.
+Programmcode vornehmen zu müssen.\par
+\endgroup
 
 Über die Konfiguration werden unter anderem Parameter der Dokumentenauswahl,
 des Chunkings, des Embedding-Modells, der OpenSearch-Anbindung, des Retrievals

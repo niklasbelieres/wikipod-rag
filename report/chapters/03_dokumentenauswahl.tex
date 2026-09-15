@@ -31,14 +31,13 @@ Metadaten extrahiert:
     \item Summe der Aufrufe über 24 Stunden
 \end{itemize}
 
-Die Aufrufszahlen der einzelnen Artikel erhalten wir durch die Aggregation von, durch Wikimedia (QUELLE) bereitgestellten, Pageview-Dumps, welche
-über einen Zeitraum eines vorher konfigurierten Tages gesammelt und Anhand der Artikeltitel, welche im vorhinein normalisiert wurden, eindeutig
+Die Aufrufszahlen der einzelnen Artikel erhalten wir durch die Aggregation von durch Wikimedia bereitgestellten Pageview-Dumps~\cite{wikimedia-pageviews}, welche
+über einen Zeitraum eines vorher konfigurierten Tages gesammelt und anhand der Artikeltitel, welche im Vorhinein normalisiert wurden, eindeutig
 zugeordnet werden können.
 Zusätzlich zu den oben aufgeführten Metadaten aggregieren wir die Anzahl der Aufrufe eines Artikels an einem vorher konfigurierten Tag mithilfe von Wikimedia-Pageview-Dumps, 
 welche mithilfe von vorher normalisierten Titeln mit den eigentlichen Artikeln verknüpft werden können.
 
-ÜBERLEITUNG:
-Die einzelnen Metadaten können anhand einer Konfigurationsdatei verschieden Gewichtet werden, um je nach Priorisierung unterschiedliche Ergebnisse im Scoring zu erzielen.
+Die einzelnen Metadaten können anhand einer Konfigurationsdatei verschieden gewichtet werden, um je nach Priorisierung unterschiedliche Ergebnisse im Scoring zu erzielen.
 
 \section{Link-Frequenz-Map und Zwei-Pass-Architektur}
 
@@ -142,16 +141,16 @@ Iteration der Scoring-Funktion aufgegriffen.
 
 
 \section{Budget-constrained Selection}
-Das in der Aufgabenstellung definierte Ziel, eine Dokumentenauswahl anhand eines gegebenen Speicherbudget
-umzusetzen, haben wir als 0/1-Knapsack-Problem modelliert: Jeder Artikel besitzt einen, durch die 
+Das in der Aufgabenstellung definierte Ziel, eine Dokumentenauswahl anhand eines gegebenen Speicherbudgets
+umzusetzen, haben wir als 0/1-Knapsack-Problem modelliert: Jeder Artikel besitzt einen durch die
 Scoring-Funktion berechneten 'Wert' und ein 'Gewicht' (Byte-Größe \texttt{html\_size\_bytes}). Ziel ist die 
 Auswahl einer Teilmenge, sodass der Gesamtwert maximiert wird, ohne aber das Gewichtslimit (hier Speicherbudget)
 zu überschreiten.
 
-Das 0/1-Knapsack-Problem ist in einer exakten Form NP-hart, was für unsbedeutet, dass eine optimale Lösung bei einem
+Das 0/1-Knapsack-Problem ist in einer exakten Form NP-hart, was für uns bedeutet, dass eine optimale Lösung bei einem
 Korpus dieser Größenordnung nicht praktikabel berechenbar ist. Allerdings ist eine Approximation durch
 Nutzung der Greedy-Heuristik möglich. Hierbei wird für jeden Artikel das Verhältnis von Score zu 
-Byte-Größe ('Score pro Byte') berechnet, die Artikel werden absteigend danach sortiert, und in dieser Reihenfolge
+Byte-Größe ('Score pro Byte') berechnet, die Artikel werden absteigend danach sortiert und in dieser Reihenfolge
 ausgewählt, bis das Budget ausgeschöpft ist. Diese Heuristik liefert zwar keine nachweislich optimale
 Lösung, ist aber als Standardansatz für Knapsack-Instanzen dieser Größe etabliert und in $O(n \log n)$
 effizient berechenbar.

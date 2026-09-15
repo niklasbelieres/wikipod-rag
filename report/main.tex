@@ -29,6 +29,7 @@
 \usepackage[ngerman]{babel}
 \usepackage[T1]{fontenc}
 \usepackage[autostyle, german=quotes]{csquotes}
+\usepackage{amsopn}
 
 % -- Seitenlayout ---------------------------------------------------------------
 \usepackage[margin=2.5cm]{geometry}
@@ -118,7 +119,10 @@
 \include{chapters/09_diskussion}
 \include{chapters/10_fazit}
 
+\begingroup
+\raggedright
 \printbibliography
+\endgroup
 
 \appendix
 \include{chapters/a1_anhang}
