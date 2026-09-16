@@ -1,24 +1,16 @@
-# Overrides for the target deployment (Raspberry Pi 5, 16 GB RAM, 1 TB SSD).
 paths:
-  zim_file: "/data/raw/wikipedia_en_all_mini.zim"
-  data_dir: "/data"
-  # Produce this with: wikipod fetch-pageviews --date <YYYY-MM-DD> --out /data/pageviews-aggregated.txt
-  pageviews_file: "/data/pageviews-aggregated.txt"
+  zim_file: "data/wikipedia_en.zim"
+  pageviews_file: "data/pageviews-aggregated.txt" # produced by `wikipod fetch-pageviews` above
+  data_dir: "data"
 
 selection:
-  storage_budget_mb: 200000 # ~200 GB
+  storage_budget_mb: 13000
   weights:
     word_count: 0.15
     link_count: 0.15
     importance: 0.15
     incoming_links: 0.25
-    pageviews: 0.3
+    pageviews: 0.3 # enabled here -- requires paths.pageviews_file to exist, see Usage above
 
 opensearch:
-  host: "localhost"
-  port: 9200
   index_name: "wikipod-chunks-server"
-
-llm:
-  backend: "llama_cpp"
-  model_path: "models/qwen2.5-1.5b-instruct-q4_k_m.gguf"
