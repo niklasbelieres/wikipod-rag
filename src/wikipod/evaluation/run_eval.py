@@ -193,9 +193,7 @@ def run_eval(
     ]
     by_category = {}
 
-    for entry in per_query:
-        category = entry["category"]
-
+    for category, entry in zip(categories, per_query, strict=True):
         if category not in by_category:
             by_category[category] = []
 
