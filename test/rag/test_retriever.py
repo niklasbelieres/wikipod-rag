@@ -28,6 +28,7 @@ def test_retrieve_converts_hits_into_chunks():
         )
         chunks = retriever.retrieve("what is climate change?")
 
+    assert chunks[0].section_index == 0
     assert len(chunks) == 1
     assert chunks[0].article_title == "Climate change"
     assert chunks[0].text == "Climate change refers to long-term shifts."
@@ -54,3 +55,19 @@ def test_retrieve_falls_back_to_configured_top_k():
         retriever.retrieve("query")
 
     assert mock_search.call_args.kwargs.get("k") == 7
+
+
+def test_retrieve_preserves_distinct_section_ids():
+    hits = [
+        {
+            "article_id": 1, "article_title": "Example", "section_title": "History",
+            "section_index": section_index, "chunk_index": 0, "text": text,
+        }
+        for section_index, text in enumerate(["first section", "second section"])
+    ]
+    with patch("wikipod.rag.retriever.knn_search", return_value=hits):
+        retriever = Retriever(MagicMock(), "test", _fake_embedder())
+        chunks = retriever.retrieve("history")
+
+    assert [chunk.section_index for chunk in chunks] == [0, 1]
+    assert [chunk.chunk_id for chunk in chunks] == ["1-0-0", "1-1-0"]

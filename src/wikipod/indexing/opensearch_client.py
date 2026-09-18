@@ -41,6 +41,7 @@ def index_mapping(dimension: int) -> dict[str, Any]:
                 "article_id": {"type": "integer"},
                 "article_title": {"type": "keyword"},
                 "section_title": {"type": "keyword"},
+                "section_index": {"type": "integer"},
                 "chunk_index": {"type": "integer"},
                 "embedding": {
                     "type": "knn_vector",
@@ -85,6 +86,7 @@ def index_chunks(
                 "article_id": chunk.article_id,
                 "article_title": chunk.article_title,
                 "section_title": chunk.section_title,
+                "section_index": chunk.section_index,
                 "chunk_index": chunk.chunk_index,
                 "embedding": vector.tolist(),
             },

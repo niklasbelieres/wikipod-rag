@@ -89,3 +89,52 @@ def test_chunk_article_returns_flat_chunk_list():
     assert isinstance(chunks, list)
     assert all(isinstance(chunk, Chunk) for chunk in chunks)
     assert not any(isinstance(item, list) for item in chunks)
+
+
+@pytest.mark.parametrize("section_title", ["History", ""])
+def test_repeated_section_titles_have_unique_stable_chunk_ids(section_title):
+    sections = [
+        Section(
+            article_id=1, article_title="Example", section_title=section_title,
+            text=text,
+        )
+        for text in ["a b c d e", "f g h i j"]
+    ]
+    article = ArticleMetadata(
+        article_id=1, title="Example", html_size_bytes=100, word_count=10,
+        link_count=0, links=[], section_count=2, sections=sections, categories=[],
+    )
+
+    chunks = chunk_article(article, max_words=3, overlap=1)
+    ids = [chunk.chunk_id for chunk in chunks]
+
+    assert len(ids) == len(set(ids)) == 4
+    assert [chunk.text for chunk in chunks] == ["a b c", "c d e", "f g h", "h i j"]
+    assert ids == [
+        chunk.chunk_id for chunk in chunk_article(article, max_words=3, overlap=1)
+    ]
+
+
+@pytest.mark.parametrize("max_words,overlap", [(0, 0), (-1, 0), (3, -1), (3, 3), (3, 4)])
+def test_direct_chunking_rejects_invalid_parameters_even_for_empty_input(max_words, overlap):
+    section = Section(article_id=1, article_title="Test", section_title="Intro", text="")
+    article = ArticleMetadata(
+        article_id=1, title="Test", html_size_bytes=0, word_count=0,
+        link_count=0, links=[], section_count=0, sections=[], categories=[],
+    )
+    with pytest.raises(ValueError):
+        chunk_section(section, max_words=max_words, overlap=overlap)
+    with pytest.raises(ValueError):
+        chunk_article(article, max_words=max_words, overlap=overlap)
+
+
+@pytest.mark.parametrize("max_words,overlap,expected", [
+    (1, 0, ["a", "b", "c", "d"]),
+    (2, 0, ["a b", "c d"]),
+    (2, 1, ["a b", "b c", "c d"]),
+])
+def test_direct_chunking_valid_boundaries_preserve_words(max_words, overlap, expected):
+    section = Section(
+        article_id=1, article_title="Test", section_title="Intro", text="a b c d"
+    )
+    assert [chunk.text for chunk in chunk_section(section, max_words, overlap)] == expected

@@ -36,6 +36,8 @@ def _hit_to_chunk(hit: dict) -> Chunk:
         article_id=hit["article_id"],
         article_title=hit["article_title"],
         section_title=hit["section_title"],
+        # Legacy indices remain readable; rebuild them to obtain unique section IDs.
+        section_index=hit.get("section_index", 0),
         chunk_index=hit["chunk_index"],
         word_count=len(hit["text"].split()),
         text=hit["text"],

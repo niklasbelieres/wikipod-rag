@@ -196,7 +196,10 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
 
 @cli.command()
 @click.argument("text")
-@click.option("--top-k", default=None, type=int, help="Override config.retrieval.top_k.")
+@click.option(
+    "--top-k", default=None, type=click.IntRange(min=1),
+    help="Override config.retrieval.top_k.",
+)
 @click.option(
     "--chunks-only", is_flag=True, help="Only show retrieved chunks, skip LLM generation."
 )

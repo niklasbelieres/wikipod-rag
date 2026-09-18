@@ -14,10 +14,10 @@ Usage:
 import os
 from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = PROJECT_ROOT / "config"
@@ -44,13 +44,19 @@ class SelectionConfig(BaseModel):
 
 
 class ChunkingConfig(BaseModel):
-    max_words: int = 250
-    overlap: int = 40
+    max_words: int = Field(default=250, gt=0)
+    overlap: int = Field(default=40, ge=0)
+
+    @model_validator(mode="after")
+    def validate_overlap(self) -> Self:
+        if self.overlap >= self.max_words:
+            raise ValueError("overlap must be smaller than max_words")
+        return self
 
 
 class EmbeddingsConfig(BaseModel):
     model_name: str
-    batch_size: int = 32
+    batch_size: int = Field(default=32, gt=0)
     dimension: int = 384
 
 
@@ -74,7 +80,7 @@ class LLMConfig(BaseModel):
 
 
 class RetrievalConfig(BaseModel):
-    top_k: int = 5
+    top_k: int = Field(default=5, gt=0)
 
 
 class WikipodConfig(BaseModel):

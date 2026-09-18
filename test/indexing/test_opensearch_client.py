@@ -70,3 +70,26 @@ def test_round_trip_index_and_search():
     assert hits[0]["article_id"] == 1
 
     client.indices.delete(index=config.index_name)
+
+
+def test_index_chunks_preserves_distinct_sections(monkeypatch):
+    chunks = [
+        _chunk(1, "first section"),
+        _chunk(1, "second section").model_copy(update={"section_index": 1}),
+    ]
+    captured = []
+
+    def capture_bulk(client, actions, stats_only):
+        captured.extend(actions)
+        return len(captured), []
+
+    monkeypatch.setattr("wikipod.indexing.opensearch_client.helpers.bulk", capture_bulk)
+    count = index_chunks(None, "test", chunks, np.zeros((2, 4)))
+
+    assert count == 2
+    assert len({action["_id"] for action in captured}) == 2
+    assert [action["_source"]["section_index"] for action in captured] == [0, 1]
+    assert [action["_source"]["text"] for action in captured] == [
+        "first section", "second section",
+    ]
+    assert index_mapping(4)["mappings"]["properties"]["section_index"] == {"type": "integer"}

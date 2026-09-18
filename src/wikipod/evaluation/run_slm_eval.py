@@ -114,7 +114,10 @@ def write_model_results(output_dir: Path, model_name: str, k: int, per_query: li
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     help="Directory containing the .gguf SLM files to compare.",
 )
-@click.option("--top-k", "top_k", default=None, type=int, help="Override config.retrieval.top_k.")
+@click.option(
+    "--top-k", "top_k", default=None, type=click.IntRange(min=1),
+    help="Override config.retrieval.top_k.",
+)
 @click.option(
     "--output-dir",
     "output_dir",
@@ -128,7 +131,7 @@ def write_model_results(output_dir: Path, model_name: str, k: int, per_query: li
 def main(dataset_path: Path, models_dir: Path, top_k: int | None, output_dir: Path) -> None:
     """Run each .gguf model in MODELS_DIR against DATASET_PATH and record answers/latency."""
     config = get_config()
-    k = top_k or config.retrieval.top_k
+    k = config.retrieval.top_k if top_k is None else top_k
 
     embedder = Embedder(config.embeddings.model_name)
     client = build_client(config.opensearch)

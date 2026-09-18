@@ -101,6 +101,24 @@ started with:
 WIKIPOD_ENV=dev python -m wikipod.cli index
 ```
 
+### Rebuilding indices after the chunk-ID change
+
+Chunk IDs now use the article ID, zero-based section position, and chunk position
+within that section. This prevents equally named sections from overwriting each
+other. The same article with the same section order and chunking settings produces
+the same IDs.
+
+Existing indices must be rebuilt once to replace the old IDs and restore chunks
+that may have been overwritten. Re-indexing without recreation leaves old documents
+in the index. The following command **deletes and rebuilds the configured index**;
+select the environment whose index you intend to replace:
+
+```bash
+WIKIPOD_ENV=dev python -m wikipod.cli index --recreate-index
+```
+
+### Querying
+
 After the index has been built, a query can be executed with:
 
 ```bash

@@ -1,5 +1,5 @@
 """Chunk model: the unit that ultimately gets embedded and indexed."""
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Chunk(BaseModel):
@@ -7,6 +7,7 @@ class Chunk(BaseModel):
     article_title: str
 
     section_title: str
+    section_index: int = Field(default=0, ge=0)
     chunk_index: int
 
     word_count: int
@@ -14,5 +15,5 @@ class Chunk(BaseModel):
 
     @property
     def chunk_id(self) -> str:
-        """Stable identifier used as the OpenSearch document id."""
-        return f"{self.article_id}-{self.section_title}-{self.chunk_index}"
+        """Identify a chunk by article, section position and position within the section."""
+        return f"{self.article_id}-{self.section_index}-{self.chunk_index}"

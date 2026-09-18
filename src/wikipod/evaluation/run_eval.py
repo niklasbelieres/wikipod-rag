@@ -239,7 +239,10 @@ def run_eval(
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="Path to the eval dataset (YAML/JSON list of {query, relevant_titles}).",
 )
-@click.option("--top-k", "top_k", default=None, type=int, help="Override config.retrieval.top_k.")
+@click.option(
+    "--top-k", "top_k", default=None, type=click.IntRange(min=1),
+    help="Override config.retrieval.top_k.",
+)
 
 @click.option(
     "--output",
@@ -290,7 +293,7 @@ def main(
 ) -> None:
     """Run retrieval evaluation against DATASET_PATH and print all metrics."""
     config = get_config()
-    k = top_k or config.retrieval.top_k
+    k = config.retrieval.top_k if top_k is None else top_k
 
     embedder = Embedder(config.embeddings.model_name)
     client = build_client(config.opensearch)
