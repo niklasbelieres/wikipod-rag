@@ -3,36 +3,263 @@
 % Deckt Ziel 4 ab: "Auswahl eines fuer die Hardware geeigneten Sprachmodells"
 % + die eigentliche Antwortgenerierung.
 
+Nachdem der Retriever aus Kapitel~\ref{ch:indexierung} zu einer Anfrage die am besten
+passenden Text-Chunks liefert, müssen diese in eine für ein Sprachmodell verwertbare
+Form gebracht und anschließend an ein tatsächlich auf der Zielhardware lauffähiges
+Sprachmodell übergeben werden. Dieses Kapitel behandelt die dafür zuständige
+Pipeline-Stufe: die Konstruktion des Prompts aus Anfrage und Kontext, die Auswahl
+eines für den Raspberry Pi geeigneten Sprachmodells sowie die Anbindung der beiden
+unterstützten Inferenz-Backends. Den Abschluss bilden konkrete Beispielinteraktionen,
+die das resultierende Grounding-Verhalten des Systems veranschaulichen.
+
 \section{Prompt-Konstruktion}
-% System-Prompt (Grounding-Anweisung: nur aus Kontext antworten, sonst
-% zugeben es nicht zu wissen), Kontext-Budget (Wortzaehlung als Token-Proxy,
-% Bezug zu n\_ctx), Umgang mit leeren Retrieval-Ergebnissen.
+\label{sec:prompt-konstruktion}
+
+Die Übersetzung von Anfrage und erhaltenen Chunks in einen an das Sprachmodell
+sendbaren Prompt übernimmt das Modul \texttt{rag/prompt\_builder.py}. Es enthält
+bewusst weder Modell-Ladelogik noch Netzwerk-I/O und lässt sich dadurch unabhängig
+von einem laufenden Backend testen. Das Ergebnis ist keine einzelne Zeichenkette,
+sondern eine Liste von Chat-Nachrichten der Form
+\texttt{[\{"role": ..., "content": ...\}]}, da sowohl die \texttt{llama-cpp-python}-
+als auch die Ollama-Schnittstelle (Abschnitt~\ref{sec:backend-anbindung}) dieses
+Format erwarten und der Prompt-Builder dadurch backend-unabhängig bleibt.
+
+\paragraph{System-Prompt.} Jeder Anfrage wird derselbe System-Prompt vorangestellt:
+
+\begin{quote}
+\ttfamily\small
+"You are an assistant answering questions using only the Wikipedia excerpts given
+below as context. Answer using only information contained in the excerpts. If the
+excerpts do not contain enough information to answer, say so explicitly instead of
+guessing. Keep answers concise, and refer to excerpts by their [n] number when
+useful."
+\end{quote}
+
+Der System-Prompt verfolgt damit zwei Ziele: Erstens soll das Modell seine Antwort
+ausschließlich auf den mitgelieferten Wikipedia-Kontext stützen (Grounding) und nicht
+auf im Modell selbst gespeichertes Weltwissen zurückgreifen. Zweitens wird das Modell
+explizit angewiesen, bei unzureichendem Kontext dies offen zuzugeben, anstatt eine
+Antwort zu erraten. Beide Anweisungen lassen sich nicht technisch erzwingen, sondern
+sind Instruktionen an ein instruction-getuntes Sprachmodell; ihre Wirksamkeit hängt
+entsprechend vom gewählten Modell ab (Abschnitt~\ref{sec:slm-auswahl}) und wird in
+Abschnitt~\ref{sec:beispielinteraktionen} anhand konkreter Beispiele eingeordnet.
+
+\paragraph{Kontextformatierung und Quellenattribution.} Die erhaltenen Chunks
+werden über \texttt{format\_context()} zu einem nummerierten, quellenattributierten
+Textblock zusammengesetzt:
+
+\begin{quote}
+\ttfamily\small
+[1] (Climate change - Causes) Human activity is the main driver...\\
+{[2]} (Climate change - Lead) Present-day climate change includes...
+\end{quote}
+
+Jede Zeile enthält neben dem eigentlichen Chunk-Text den Titel des zugehörigen
+Wikipedia-Artikels sowie den Titel des Abschnitts, aus dem der Chunk stammt. Beide
+Angaben stehen bereits als Metadaten im \texttt{Chunk}-Objekt zur Verfügung, da sie
+während des Chunkings pro Abschnitt gesetzt werden (Abschnitt~\ref{sec:chunking-strategie}).
+Die fortlaufende Nummerierung erlaubt es dem Sprachmodell, gemäß der Anweisung im
+System-Prompt einzelne Aussagen im Fließtext auf eine konkrete Quelle zurückzuführen
+(\texttt{[n]}). Dieser Mechanismus macht die Herkunft einer generierten Aussage
+nachvollziehbar, ersetzt jedoch keine Prüfung, ob das Modell die Quellenangabe auch
+korrekt zuordnet.
+
+\paragraph{Kontext-Budget.} Da erhaltenen Chunks in der Summe das Kontextfenster des
+Sprachmodells überschreiten können, begrenzt \texttt{\_fit\_to\_budget()} die
+tatsächlich in den Prompt aufgenommene Chunk-Menge auf ein Wortbudget von
+standardmäßig 800 Wörtern (\texttt{DEFAULT\_MAX\_CONTEXT\_WORDS}). Die Wortanzahl dient
+dabei als Näherung für die tatsächliche Token-Anzahl: Für englischsprachigen Text
+liegen gängige Tokenizer bei ungefähr 1,3 Token pro Wort, sodass 800 Wörter deutlich
+unterhalb des in \texttt{config.llm.n\_ctx} konfigurierten Kontextfensters von 4096
+Token bleiben. Der verbleibende Spielraum wird für den System-Prompt sowie die
+maximale Antwortlänge (\texttt{config.llm.max\_tokens}, standardmäßig 400 Token)
+benötigt.
+
+Die Auswahl der tatsächlich in den Prompt aufgenommenen Chunks erfolgt greedy: Die
+bereits nach Relevanz sortierten Chunks werden in dieser Reihenfolge durchlaufen,
+wobei ein Chunk, der das Budget überschreiten würde, übersprungen und die Prüfung mit
+dem nächstplatzierten Chunk fortgesetzt wird, statt beim ersten nicht mehr passenden
+Chunk abzubrechen. Dasselbe Prinzip verwendet bereits die budgetbeschränkte
+Artikelauswahl aus Kapitel~\ref{ch:dokumentenauswahl}; ein einzelner, ungewöhnlich
+langer Chunk verdrängt dadurch nicht automatisch alle nachfolgenden, kürzeren und
+unter Umständen ebenfalls relevanten Chunks.
+
+\paragraph{Leere Retrieval-Ergebnisse.} Liefert der Retriever keine Chunks -- etwa bei
+einer Anfrage zu einem nicht im Index enthaltenen Thema --, wird der Prompt dennoch
+abgesendet. An die Stelle des Kontextblocks tritt dann der feste Hinweistext
+\texttt{No relevant excerpts were found in the indexed Wikipedia subset.} Ein
+Sonderfall im Aufrufercode ist dafür nicht nötig, da der System-Prompt das Modell
+bereits anweist, in einer solchen Situation das Fehlen ausreichender Informationen zu
+benennen. Wie sich dieses Zusammenspiel in der Praxis auswirkt, wenn zwar keine
+vollständig leere, aber eine inhaltlich unpassende Trefferliste zurückgegeben wird,
+wird in Abschnitt~\ref{sec:beispielinteraktionen} diskutiert.
+
 
 \section{Sprachmodell-Auswahl}
-% Kandidaten (z. B. Qwen2.5-1.5B-Instruct, Llama-3.2-1B/3B), Kriterien
-% (RAM-Bedarf, Tokens/s auf ARM, Antwortqualitaet). Vergleichstabelle mit
-% den tatsaechlichen Messwerten -- das ist der zentrale Inhalt dieses
-% Abschnitts, den die Aufgabenstellung explizit verlangt.
+\label{sec:slm-auswahl}
 
-% \begin{table}[H]
-%     \centering
-%     \begin{tabular}{lrrr}
-%         \toprule
-%         Modell & RAM (GB) & Tokens/s & Qualitaet (subjektiv) \\
-%         \midrule
-%         Qwen2.5-1.5B-Instruct & ... & ... & ... \\
-%         Llama-3.2-1B-Instruct & ... & ... & ... \\
-%         \bottomrule
-%     \end{tabular}
-%     \caption{Vergleich der evaluierten Sprachmodelle}
-% \end{table}
+Für die Textgenerierung wurden drei quantisierte, instruction-getunte Sprachmodelle
+im GGUF-Format evaluiert: \texttt{Qwen2.5-1.5B-Instruct}~\cite{qwen25-model-card},
+\texttt{Llama-3.2-1B-Instruct}~\cite{llama32-model-card} und
+\texttt{Phi-3.5-mini-instruct}~\cite{phi35-model-card}. Alle drei Kandidaten liegen im
+Q4\_K\_M-Quantisierungsformat vor, einer 4-Bit-Gewichtsquantisierung, die von der für
+die CPU-only-Inferenz auf dem Raspberry Pi eingesetzten
+\texttt{llama.cpp}-Bibliothek~\cite{llamacpp-repo} unterstützt wird und gegenüber der
+vollpräzisen Modellversion Speicherbedarf und Rechenaufwand deutlich reduziert. Die
+Auswahl dieser drei Modelle war durch die Zielhardware motiviert: Alle drei zählen zu
+den kleineren aktuell verfügbaren instruction-getunten Sprachmodellen und werden von
+ihren jeweiligen Herausgebern explizit auch für ressourcenbeschränkte Einsatzszenarien
+vorgesehen.
+
+\begin{table}[ht]
+    \centering
+    \caption{Verglichene Sprachmodelle}
+    \label{tab:slm-vergleich}
+    \begin{tabular}{lrrrl}
+        \toprule
+        Modell & Parameter & Kontextfenster & Größe (Q4\_K\_M) & Lizenz \\
+        \midrule
+        Llama 3.2 1B Instruct   & 1,23 Mrd. & 128.000 Token & 771 MB & Llama 3.2 Community License \\
+        Qwen2.5 1.5B Instruct   & 1,54 Mrd. & 32.768 Token  & 1,1 GB & Apache 2.0 \\
+        Phi-3.5 Mini Instruct   & 3,8 Mrd.  & 128.000 Token & 2,3 GB & MIT \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Die in Tabelle~\ref{tab:slm-vergleich} angegebenen Kontextfenster sind die von den
+Herausgebern dokumentierten nativen Maximalwerte der jeweiligen Modelle. Innerhalb von
+WikiPod wird davon unabhängig für alle drei Modelle einheitlich das in
+\texttt{config.llm.n\_ctx} konfigurierte Kontextfenster von 4096 Token verwendet
+(Abschnitt~\ref{sec:prompt-konstruktion}). Ein größeres Kontextfenster würde bei
+\texttt{llama.cpp} zusätzlichen Arbeitsspeicher für den Attention-Cache (KV-Cache)
+belegen, ohne dass die Prompt-Konstruktion aus Abschnitt~\ref{sec:prompt-konstruktion}
+-- System-Prompt, ein auf 800 Wörter begrenzter Kontextblock und eine auf 400 Token
+begrenzte Antwort -- diesen Spielraum überhaupt ausschöpfen würde. Auf der
+CPU-only-Zielhardware wird das konfigurierte Kontextfenster somit bewusst klein
+gehalten.
+
+Die eigentliche Generierungslatenz der drei Modelle auf dem Raspberry Pi wurde bereits
+in Kapitel~\ref{ch:evaluation} (Tabelle~\ref{tab:pi-generation-latency}) im Rahmen
+der Effizienzevaluation gemessen und dort ausführlich diskutiert: Qwen2.5 1.5B und
+Llama 3.2 1B lagen mit rund 28 beziehungsweise 29 Sekunden mittlerer Latenz pro
+Anfrage nah beieinander, während Phi-3.5 Mini mit über 150 Sekunden deutlich
+langsamer war. Dieser Abschnitt konzentriert sich daher ergänzend auf die
+Antwortqualität, da für den in Kapitel~\ref{ch:evaluation} dokumentierten
+Modellvergleich bewusst keine quantitative Qualitätsmetrik erhoben wurde.
+
+Bei manueller Durchsicht der bei der Latenzmessung erzeugten Antworten desselben
+Evaluationsdatensatzes zeigen sich zwischen den drei Modellen qualitative
+Unterschiede im Umgang mit dem im System-Prompt geforderten Antwortstil. Auf die
+Anfrage \textit{"Which music group did Michael Jackson perform with before becoming a
+successful solo artist?"} antwortete Qwen2.5 1.5B mit \texttt{The Jackson 5} -- knapp
+und ohne überflüssige Ausführungen, wie es der System-Prompt (\texttt{Keep answers
+concise}) vorgibt. Phi-3.5 Mini beantwortete dieselbe Anfrage inhaltlich korrekt,
+jedoch deutlich ausführlicher und mit explizit in den Fließtext eingebundenen
+Quellenverweisen (\textit{"According to the information provided in excerpts [1] and
+[2], Michael Jackson performed with The Jackson 5 [...]"}). Llama 3.2 1B lieferte für
+dieselbe Anfrage eine inhaltlich ebenfalls korrekte Antwort, die jedoch mit der
+unverändert aus dem Kontextblock übernommenen Nummerierung \texttt{[1]} beginnt
+(\textit{"[1] The Jackson 5, later known as The Jacksons, was an American pop band
+[...]"}), anstatt den Quellenverweis wie vom System-Prompt vorgesehen in den
+Antworttext zu integrieren. Ein vergleichbares Muster zeigt sich bei der Anfrage nach
+dem südafrikanischen Anti-Apartheid-Aktivisten, der 27 Jahre im Gefängnis saß, bevor
+er ins Präsidentenamt gewählt wurde: Llama 3.2 1B beantwortete auch diese Anfrage mit
+vorangestelltem \texttt{[1]}, während Qwen2.5 1.5B inhaltlich nahezu identisch, aber
+ohne diesen Formatierungsartefakt antwortete.
+
+Diese Beobachtungen beruhen auf einer kleinen, nicht systematisch ausgewerteten
+Stichprobe einzelner Antworten und ersetzen keine quantitative Qualitätsbewertung;
+sie werden hier ausschließlich als Begründung für die getroffene Auswahlentscheidung
+angeführt. In der Zusammenschau aus gemessener Latenz und den beschriebenen
+qualitativen Beobachtungen wurde \texttt{Qwen2.5-1.5B-Instruct} als Standardmodell für
+\texttt{config/default.yaml} und \texttt{config/prod.yaml} übernommen: Es erreichte in
+Kapitel~\ref{ch:evaluation} die niedrigste gemessene Generierungslatenz der drei
+Kandidaten, produzierte in der hier beschriebenen Stichprobe durchgehend prägnante,
+inhaltlich mit den beiden anderen Modellen übereinstimmende Antworten und wies dabei
+nicht das bei Llama 3.2 1B beobachtete Formatierungsartefakt auf. Phi-3.5 Mini wurde
+trotz ausführlicherer, explizit belegter Antworten aufgrund der deutlich höheren
+Latenz nicht als Standardmodell übernommen.
+
+\todo{Vollständiger End-to-End-Lauf auf dem Edge-Case-Datensatz
+für alle drei Modelle bauen und zeige und auch die Grenzfälle aus Kapitel~\ref{ch:evaluation}}
+
 
 \section{Backend-Anbindung}
-% Zwei Backends (llama.cpp direkt vs. Ollama), warum beide unterstuetzt
-% werden (Ollama fuer schnelle lokale Entwicklung, llama.cpp naeher am
-% finalen Pi-Deployment ohne separaten Daemon).
+\label{sec:backend-anbindung}
+
+Die Anbindung des Sprachmodells kapselt die Klasse \texttt{Generator} in
+\texttt{rag/generator.py}. Sie nimmt die von \texttt{build\_messages()} erzeugte
+Chat-Nachrichtenliste entgegen und gibt unabhängig vom konfigurierten Backend einen
+generierten Antworttext zurück, sodass der aufrufende Code (\texttt{cli.py}) nicht
+zwischen den Backends unterscheiden muss. Welches Backend verwendet wird, legt
+\texttt{config.llm.backend} fest; unterstützt werden zwei Werte:
+
+\begin{itemize}
+    \item \texttt{'llama\_cpp'}: Lädt eine lokale GGUF-Datei direkt über die
+    \texttt{llama-cpp-python}-Bindung (eine optionale Abhängigkeit, siehe das
+    \texttt{[llm]}-Extra in \texttt{pyproject.toml}) und ruft
+    \texttt{create\_chat\_completion()} mit den konfigurierten Werten für
+    \texttt{max\_tokens} und \texttt{temperature} auf. Dieses Backend läuft ohne
+    separaten Server-Prozess und entspricht damit dem für die Zielhardware
+    vorgesehenen Deployment: In \texttt{config/prod.yaml} ist ausschließlich dieses
+    Backend konfiguriert.
+    \item \texttt{'ollama'}: Spricht stattdessen per HTTP einen laufenden
+    Ollama-Daemon an (\texttt{POST /api/chat}) und übergibt Nachrichtenliste sowie
+    Generierungsparameter als JSON-Body. Da für dieses Backend lediglich
+    \texttt{ollama pull <modell>} statt eines manuellen GGUF-Downloads und Kompilierens
+    von \texttt{llama-cpp-python} nötig ist, wird es in \texttt{config/dev.yaml} und
+    \texttt{config/pi-test.yaml} für die lokale Entwicklung beziehungsweise einen
+    Testlauf im mittleren Maßstab verwendet.
+\end{itemize}
+
+Beide Implementierungen erwarten und liefern dasselbe von
+Abschnitt~\ref{sec:prompt-konstruktion} beschriebene Nachrichtenformat, sodass ein
+Wechsel des Backends -- etwa von \texttt{ollama} während der Entwicklung zu
+\texttt{llama\_cpp} auf dem Raspberry Pi -- keine Änderung an Prompt-Konstruktion oder
+Retrieval erfordert. Das Laden eines GGUF-Modells über \texttt{llama\_cpp} ist der mit
+Abstand teuerste Teil der Backend-Initialisierung; \texttt{\_load\_llama\_cpp\_model()}
+cached daher analog zum in Kapitel~\ref{ch:indexierung} beschriebenen Embedding-Modell
+die geladene \texttt{Llama}-Instanz pro Kombination aus Modellpfad und Kontextgröße
+(\texttt{@lru\_cache(maxsize=2)}), sodass ein Modell innerhalb eines Prozesses nur
+einmal geladen werden muss. Fehlt die konfigurierte GGUF-Datei, bricht der
+\texttt{llama\_cpp}-Pfad mit einer aussagekräftigen Fehlermeldung ab, die sowohl auf
+eine Bezugsquelle für das Modell als auch auf die Möglichkeit verweist, für die lokale
+Entwicklung stattdessen auf das \texttt{ollama}-Backend zu wechseln.
+
 
 \section{Beispielinteraktionen}
-% 1-2 konkrete Query/Antwort-Beispiele mit Quellenangabe, zeigt Grounding
-% in der Praxis (auch negatives Beispiel: Frage ausserhalb des indexierten
-% Bestands, Modell gibt korrekt zu es nicht zu wissen).
+\label{sec:beispielinteraktionen}
+
+Anhand einer Anfrage aus dem regulären Evaluationsdatensatz
+(Kapitel~\ref{ch:evaluation}) lässt sich das Grounding-Verhalten des Systems
+konkret nachvollziehen. Auf die Anfrage \textit{"Which South African anti-apartheid
+activist spent 27 years in prison before becoming the country's first black
+president?"} lieferte das mit \texttt{Qwen2.5-1.5B-Instruct} generierte System die
+Antwort:
+
+\begin{quote}
+\itshape
+Nelson Rolihlahla Mandela spent 27 years in prison before becoming the country's
+first black president.
+\end{quote}
+
+Die Antwort entspricht dabei nahezu wörtlich einer Formulierung aus dem extrahierten
+Wikipedia-Artikel zu Nelson Mandela, dem gemäß Evaluationsdatensatz auch tatsächlich
+relevanten Ground-Truth-Artikel. Sie belegt damit, dass das Modell die Antwort aus dem
+im Prompt bereitgestellten Kontext übernimmt, statt auf einen aus dem Vortraining
+stammenden, nicht mit einer Quelle belegten Wissensstand zurückzugreifen.
+
+Für den in der Aufgabenstellung ebenfalls geforderten negativen Fall -- eine Anfrage zu
+einem nicht im indexierten Bestand enthaltenen Thema -- enthält der in
+Kapitel~\ref{ch:evaluation} beschriebene Edge-Case-Datensatz
+(\texttt{test/data/eval\_edge\_case\_queries.yaml}) die als \texttt{out\_of\_scope}
+markierte Anfrage \texttt{Tell me about Albert Einstein}, für die keine relevanten
+Ground-Truth-Titel hinterlegt sind. Die dort dokumentierte Retrieval-Auswertung zeigt,
+dass für diese Anfrage keine leere Trefferliste zurückgegeben wird, sondern
+inhaltlich nicht einschlägige Chunks -- unter anderem zum Artikel \texttt{Martin
+Luther King Jr.} Für diesen konkreten Fall greift somit nicht die in
+Abschnitt~\ref{sec:prompt-konstruktion} beschriebene Fallback-Behandlung für leere
+Retrieval-Ergebnisse, sondern es liegt am System-Prompt selbst, anhand eines
+inhaltlich unpassenden, aber nicht leeren Kontextblocks zu erkennen, dass die
+Anfrage nicht ausreichend beantwortet werden kann.
+
