@@ -1,19 +1,19 @@
 """Generates an answer from a chat-message prompt using a small local LLM.
 
 Backend-agnostic wrapper driven by `config.llm.backend`, taking the message
-list built by `rag/prompt_builder.py` and returning generated text -- the
+list built by `rag/prompt_builder.py` and returning generated text; the
 rest of the pipeline (cli.py) never needs to know which backend is active.
 
 - "llama_cpp": loads a local GGUF file directly via `llama-cpp-python`
-  (optional dependency, see `pyproject.toml`'s `[llm]` extra). This is what
-  actually runs standalone on the Raspberry Pi target: no separate daemon,
-  direct control over context size (`config.llm.n_ctx`) and threads.
+  (optional dependency, see `pyproject.toml`'s `[llm]` extra). Runs
+  standalone on the Raspberry Pi target: no separate daemon, direct control
+  over context size (`config.llm.n_ctx`) and threads.
 - "ollama": talks to a running Ollama daemon over its HTTP API
-  (POST /api/chat). Nothing to compile, much faster to set up for local dev
+  (POST /api/chat). Nothing to compile, faster to set up for local dev
   (`ollama pull <model>`) while iterating away from the Pi.
 
-Model loading is lazy and cached per (model_path, n_ctx) -- loading a GGUF is
-the expensive part -- mirroring `embeddings/embedder.py`'s `_load_model`.
+Model loading is lazy and cached per (model_path, n_ctx), since loading a
+GGUF is the expensive part, mirroring `embeddings/embedder.py`'s `_load_model`.
 """
 
 from __future__ import annotations

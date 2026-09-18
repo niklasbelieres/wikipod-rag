@@ -1,11 +1,9 @@
 """Periodically samples system metrics into a CSV while a long-running job
-(e.g. `wikipod index`) is active elsewhere -- Load, RAM, Swap, and on a
+(e.g. `wikipod index`) is active elsewhere: load, RAM, swap, and on a
 Raspberry Pi, CPU temperature/throttling status.
 
-Standalone and stdlib-only on purpose: runs independently of the wikipod
-package (no pip install needed, nothing to conflict with whatever's using
-the venv for the actual indexing job) and reads straight from /proc and
-`vcgencmd` rather than pulling in psutil for what's a one-off ops script.
+Standalone and stdlib-only: has no dependency on the wikipod package or its
+venv, and reads straight from /proc and `vcgencmd` instead of using psutil.
 
 Usage (in its own tmux pane, alongside the job being watched):
     python3 -m wikipod.scripts.monitor_run --out run_metrics.csv --interval 10

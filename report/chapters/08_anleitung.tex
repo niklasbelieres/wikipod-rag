@@ -26,7 +26,7 @@ erstellt und anschließend das Projekt einschließlich der
 Entwicklungsabhängigkeiten installiert.
 
 \begin{lstlisting}[language=bash]
-git clone <https://github.com/niklasbelieres/wikipod-rag>
+git clone https://github.com/niklasbelieres/wikipod-rag
 cd wikipod-rag
 
 python -m venv .venv
@@ -35,7 +35,7 @@ pip install -e ".[dev]"
 \end{lstlisting}
 
 Anschließend muss eine Wikipedia-ZIM-Datei lokal bereitgestellt werden. Der
-Pfad zu dieser Datei wird über den Eintrag \texttt{source.zim\_file} in der
+Pfad zu dieser Datei wird über den Eintrag \texttt{paths.zim\_file} in der
 jeweiligen Konfigurationsdatei festgelegt.
 
 \section{Lokales Setup (Entwicklung)}
@@ -87,7 +87,7 @@ angegeben, verwendet WikiPod standardmäßig die Entwicklungsumgebung
 \texttt{dev}.
 
 Insbesondere muss der Pfad zur verwendeten Wikipedia-ZIM-Datei über
-\texttt{source.zim\_file} an die lokale Umgebung angepasst werden. Dadurch
+\texttt{paths.zim\_file} an die lokale Umgebung angepasst werden. Dadurch
 können unterschiedliche Datensätze und Laufzeitumgebungen verwendet werden,
 ohne die allgemeine Projektkonfiguration für jeden Versuch verändern zu
 müssen.

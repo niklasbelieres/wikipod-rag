@@ -1,15 +1,14 @@
 """Compares generation quality/latency of several local SLMs on the same eval dataset.
 
 Unlike `run_eval.py` (retrieval-only metrics), this drives the full RAG
-generation step -- but retrieval only depends on the fixed embedding model and
-index, not on which SLM answers the question. So retrieval is run exactly
-once per query up front, and each candidate model only redoes the (cheap to
-compare, expensive to run on a Pi 4) generation step against that same
-context.
+generation step. Retrieval only depends on the fixed embedding model and
+index, not on which SLM answers the question, so retrieval is run exactly
+once per query up front; each candidate model only redoes the generation
+step (expensive on a Pi 4) against that same context.
 
 Models are discovered as `*.gguf` files in a single directory (e.g. mounted
 on a Raspberry Pi 4) and run through the existing `llama_cpp` Generator
-backend directly -- no Ollama daemon required.
+backend directly; no Ollama daemon required.
 """
 
 from __future__ import annotations

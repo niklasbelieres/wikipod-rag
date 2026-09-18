@@ -1,56 +1,18 @@
 """Loads Wikipedia pageview counts as an optional article-scoring signal.
 
-Wikimedia publishes hourly/daily/monthly pageview dumps at
+Wikimedia publishes hourly pageview dumps at
 https://dumps.wikimedia.org/other/pageviews/ as gzip-compressed,
-whitespace-separated text, one row per page:
+whitespace-separated text: `<domain_code> <page_title> <view_count> <byte_size>`
+per row. `load_pageviews`/`get_views` work with an already-downloaded dump;
+`download_pageviews_day` fetches and aggregates all 24 hourly dumps for a
+date directly (a single hour is too noisy to use on its own).
 
-    <domain_code> <page_title> <view_count> <byte_size>
-
-e.g.:
-
-    en Climate_change 4821 0
-    en.m Climate_change 9110 0
-
-Usage
------
-Either bring your own already-downloaded dump:
-
-    from wikipod.selection.pageviews import load_pageviews, get_views
-
-    # 1. Download and decompress a dump, e.g.:
-    #    curl -O https://dumps.wikimedia.org/other/pageviews/2026/2026-06/pageviews-20260601-000000.gz
-    #    gunzip pageviews-20260601-000000.gz
-    pageviews = load_pageviews("pageviews-20260601-000000")
-    views = get_views(pageviews, "Climate change")
-
-...or fetch and aggregate a full day directly (single hours are noisy --
-most articles get few or zero views in any given hour):
-
-    from datetime import date
-    from wikipod.selection.pageviews import download_pageviews_day, save_pageviews
-
-    pageviews = download_pageviews_day(date(2026, 6, 1))
-    save_pageviews(pageviews, "pageviews-20260601-aggregated.txt")
-    # now point config.paths.pageviews_file at that file -- load_pageviews()
-    # reads it back exactly like any other dump, no other code needs to change.
-
-Notes
------
-- `domain_prefix` filters to a single domain code (default "en" for
-  desktop en.wikipedia.org, as opposed to "en.m" for mobile); pass a
-  different code, or aggregate several dumps, as needed.
-- Source titles use underscores ("Climate_change"); titles from other parts
-  of a pipeline (e.g. a ZIM/MediaWiki reader) often use spaces
-  ("Climate change"). `get_views()` normalizes both to the same form so
-  lookups don't silently miss -- use it instead of indexing the dict
-  directly.
-- If no pageview data is available for a given deployment, treat this
-  signal as optional: fall back to another popularity proxy (e.g. an
-  in-corpus link-frequency count) or omit it from scoring entirely.
-- `download_pageviews_hour`/`download_pageviews_day` process one hour at a
-  time entirely in memory (download -> gunzip -> filter -> discard) rather
-  than writing 24 raw multi-GB dumps to disk at once -- relevant on
-  constrained hardware like the Pi.
+`domain_prefix` (default "en") filters to one domain code, e.g. "en" for
+desktop vs. "en.m" for mobile. Titles are normalized to MediaWiki's
+underscore convention before lookup, since sources elsewhere in the
+pipeline (e.g. a ZIM reader) may use spaces instead. Always go through
+`get_views()` rather than indexing the dict directly. Pageview data is
+optional; treat a missing dump as "no signal" rather than a fatal error.
 """
 
 from __future__ import annotations
@@ -67,9 +29,9 @@ logger = logging.getLogger(__name__)
 
 PAGEVIEWS_BASE_URL = "https://dumps.wikimedia.org/other/pageviews"
 
-# Wikimedia rejects requests without a descriptive User-Agent (their anti-abuse
-# policy, see https://meta.wikimedia.org/wiki/User-Agent_policy) -- requests'
-# default UA gets a 403, not the 404 you'd expect for a missing dump.
+# Wikimedia rejects requests without a descriptive User-Agent (anti-abuse
+# policy, see https://meta.wikimedia.org/wiki/User-Agent_policy). Without
+# it, requests' default UA gets a 403 instead of a 404 for a missing dump.
 _REQUEST_HEADERS = {
     "User-Agent": "wikipod-rag/0.1 (student project, htw saar; RAG on Raspberry Pi)"
 }
@@ -100,8 +62,8 @@ def load_pageviews(path: str | Path, domain_prefix: str = "en") -> dict[str, int
         domain_prefix: only keep rows for this domain code.
 
     Returns:
-        An empty dict, with a warning logged, if `path` doesn't exist --
-        callers can treat a missing file as "no pageview data available"
+        An empty dict, with a warning logged, if `path` doesn't exist.
+        Callers can treat a missing file as "no pageview data available"
         rather than a fatal error.
     """
     path = Path(path)
@@ -116,13 +78,12 @@ def load_pageviews(path: str | Path, domain_prefix: str = "en") -> dict[str, int
 def download_pageviews_hour(day: date, hour: int, domain_prefix: str = "en") -> dict[str, int]:
     """Download and parse one hourly Wikimedia pageviews dump, entirely in memory.
 
-    Never writes the (multi-GB, all-languages) raw dump to disk -- downloads
-    the gzip bytes, decompresses and filters to `domain_prefix` in memory,
-    and discards everything except the small resulting {title: count} map.
+    Downloads the gzip bytes, decompresses and filters to `domain_prefix` in
+    memory, and discards everything except the resulting {title: count} map,
+    so the multi-GB, all-languages raw dump never touches disk.
 
     Returns an empty dict (with a warning logged) on any network/parse
-    failure, so one bad hour doesn't abort a full-day aggregation -- same
-    skip-and-log philosophy as `analysis/reader.py`'s article reading.
+    failure, so one bad hour doesn't abort a full-day aggregation.
     """
     url = f"{PAGEVIEWS_BASE_URL}/{day:%Y}/{day:%Y-%m}/pageviews-{day:%Y%m%d}-{hour:02d}0000.gz"
     try:
@@ -144,10 +105,10 @@ def download_pageviews_day(
 ) -> dict[str, int]:
     """Download and aggregate all 24 hourly dumps for `day` into one pageview map.
 
-    A single hour is noisy -- most articles get few or zero views in any
-    given hour -- summing a full day gives a much more stable popularity
-    signal. `on_progress(hours_done, 24)`, if given, is called after each
-    hour (see `cli.py`'s `fetch-pageviews` command for a progress-bar use).
+    A single hour is noisy (most articles get few or zero views in any
+    given hour); summing a full day gives a more stable popularity signal.
+    `on_progress(hours_done, 24)`, if given, is called after each hour (see
+    `cli.py`'s `fetch-pageviews` command for a progress-bar use).
     """
     merged: dict[str, int] = {}
     for hour in range(24):
@@ -160,9 +121,8 @@ def download_pageviews_day(
 
 def save_pageviews(views: dict[str, int], path: str | Path, domain_prefix: str = "en") -> None:
     """Write an aggregated {title: count} map back out in the same plain-text
-    format `load_pageviews` reads -- so the result of `download_pageviews_day`
-    can be pointed at directly via `config.paths.pageviews_file` without any
-    other part of the pipeline needing to change.
+    format `load_pageviews` reads, so the result of `download_pageviews_day`
+    can be pointed at directly via `config.paths.pageviews_file`.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -182,7 +142,7 @@ def normalize_title(title: str) -> str:
 def get_views(pageviews: dict[str, int], article_title: str) -> int:
     """Look up an article's view count by title, normalizing first.
 
-    Prefer this over `pageviews.get(title)` / `pageviews[title]` directly --
+    Prefer this over `pageviews.get(title)` / `pageviews[title]` directly:
     a raw lookup with an un-normalized title (e.g. containing spaces) can
     silently miss even when the data is present under its underscored form.
     """

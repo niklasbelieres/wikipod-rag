@@ -1,12 +1,10 @@
 """Selects the subset of articles that fits a given storage budget.
 
-The assignment asks for a subset that fits "a given storage budget" -- not a
-fixed article count -- so selection is a budget-constrained problem, not a
-simple top-N. This module treats it as a 0/1-knapsack instance and uses the
-standard greedy heuristic: rank candidates by score-per-byte ("bang for the
-buck") and take them in that order until the budget is exhausted. This isn't
-provably optimal (true 0/1-knapsack is NP-hard) but is the standard, fast,
-and well-justified approximation for a corpus this size.
+Selection is a budget-constrained problem (a storage budget, not a fixed
+article count), modeled as a 0/1-knapsack instance. Candidates are ranked
+by score-per-byte and taken in that order until the budget is exhausted.
+This greedy heuristic isn't provably optimal (0/1-knapsack is NP-hard) but
+is the standard fast approximation for a corpus this size.
 """
 
 from collections.abc import Iterable
@@ -30,11 +28,11 @@ def select_within_budget(
     """Greedily select articles by score-per-byte until `storage_budget_mb` is exhausted.
 
     `articles` only needs to be iterated once, so this accepts any iterable,
-    not just a list -- notably a generator/streaming source (see
+    not just a list, notably a generator/streaming source (see
     `analysis.reader.stream_articles_metadata_cached`), which matters at
     full-corpus scale. Each candidate's `links`/`categories` are only needed
-    to *compute* its score; the kept copy has them stripped immediately
-    after, so this never holds `links` for the full corpus at once, only for
+    to compute its score; the kept copy has them stripped immediately after,
+    so `links` for the full corpus is never held in memory at once, only for
     whichever single article is currently being scored.
     """
     budget_bytes = storage_budget_mb * BYTES_PER_MB
@@ -80,9 +78,8 @@ def select_top_n(
 ) -> list[ArticleMetadata]:
     """Rank-based selection without a storage constraint.
 
-    Kept as a simpler alternative for quick experimentation/demos; the
-    budget-aware `select_within_budget` above is what actually satisfies the
-    assignment's "given storage budget" requirement.
+    Simpler alternative for quick experimentation/demos; `select_within_budget`
+    above is the budget-aware selection used in the actual pipeline.
     """
     return sorted(
         articles,

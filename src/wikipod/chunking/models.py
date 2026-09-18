@@ -1,4 +1,4 @@
-"""Chunk model -- the unit that ultimately gets embedded and indexed."""
+"""Chunk model: the unit that ultimately gets embedded and indexed."""
 from pydantic import BaseModel
 
 

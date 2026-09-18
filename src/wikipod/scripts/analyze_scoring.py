@@ -78,8 +78,8 @@ def main() -> None:
     print(f"Reading articles from {zim_path}")
 
     # Same parallel + on-disk-cache path as `measure_corpus_size.py` and
-    # `wikipod index` pass 1 (include_sections=False -- only word_count/
-    # link_count/links/title are needed here, not full section text). Reuses
+    # `wikipod index` pass 1. include_sections=False since only word_count/
+    # link_count/links/title are needed here, not full section text. Reuses
     # the cache if one of those already built it for this ZIM, and builds it
     # here otherwise so a later `wikipod index` run gets a free cache hit.
     articles = list(

@@ -60,7 +60,7 @@ class OpenSearchConfig(BaseModel):
     use_ssl: bool = False
     verify_certs: bool = False
     index_name: str = "wikipod-chunks"
-    timeout: int = 30  # opensearch-py's own default is 10s -- too tight under load on the Pi
+    timeout: int = 30  # opensearch-py's default of 10s is too tight under load on the Pi
 
 
 class LLMConfig(BaseModel):

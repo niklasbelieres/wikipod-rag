@@ -84,8 +84,8 @@ def extract_links(root: Tag | None) -> list[str]:
     fraction of all articles, so most of the millions of link strings across
     the full corpus are exact duplicates of each other. Interning makes
     duplicates share one string object in memory instead of each holding its
-    own copy -- on the full en.wikipedia corpus this is the difference
-    between the corpus's link data fitting in RAM and not, independent of
+    own copy, which on the full en.wikipedia corpus is the difference
+    between the corpus's link data fitting in RAM or not, independent of
     (and in addition to) not keeping full article body text around
     (`analysis.metadata.extract_metadata`'s `include_sections=False`).
     """

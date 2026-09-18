@@ -1,9 +1,8 @@
 """Builds the LLM prompt from a query and the retrieved chunks.
 
 Pure text-assembly step between `rag/retriever.py` (query -> ranked `Chunk`s)
-and `rag/generator.py` (prompt -> generated answer). No model loading, no
-network I/O here -- that's what keeps this file trivially unit-testable
-without a running backend.
+and `rag/generator.py` (prompt -> generated answer). No model loading and no
+network I/O here, so this module is unit-testable without a running backend.
 
 Output format: a list of chat messages (`[{"role": ..., "content": ...}]`),
 not a single flat string. Both backends in `config.llm.backend` speak this

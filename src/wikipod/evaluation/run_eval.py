@@ -81,8 +81,8 @@ def run_eval(
 
     queries = [elem["query"] for elem in dataset]
     categories = [elem.get("category", "uncategorized") for elem in dataset]
-    # recall_at_k/reciprocal_rank erwarten relevant_ids als set (Mitgliedschaftstest),
-    # nicht als list wie im Dataset -- muss hier explizit konvertiert werden.
+    # recall_at_k/reciprocal_rank erwarten relevant_ids als set (Mitgliedschaftstest);
+    # im Dataset sind es Listen, daher hier explizit konvertieren.
     relevant_title_sets = [set(elem["relevant_titles"]) for elem in dataset]
 
     retrieval_queries = [
@@ -119,12 +119,11 @@ def run_eval(
         llm_judge_results.append(query_judge_results)
 
 
-    # Pro Query einzeln aufrufen, nicht mit allen Queries auf einmal -- beide
-    # Funktionen sind für genau eine Query definiert (siehe Signaturen in metrics.py).
+    # Pro Query einzeln aufrufen: beide Funktionen sind für genau eine Query
+    # definiert (siehe Signaturen in metrics.py).
     # strict=True ueberall: alle vier Listen sind per Konstruktion (Listcomps
-    # ueber dasselbe `dataset`) gleich lang -- ein Laengen-Mismatch waere ein
-    # echter Bug, den strict=True sofort als ValueError sichtbar macht statt
-    # ihn still zu verschlucken.
+    # ueber dasselbe `dataset`) gleich lang. Ein Laengen-Mismatch waere ein
+    # Bug, den strict=True als ValueError sichtbar macht statt ihn zu verschlucken.
     recall_at_k_values = [
         recall_at_k(retrieved, relevant, k)
         for retrieved, relevant in zip(retrieved_titles, relevant_title_sets, strict=True)

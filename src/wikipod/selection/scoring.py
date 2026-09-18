@@ -1,20 +1,19 @@
 """Scores articles for the selection step.
 
-Combines four signals, all log-dampened so no single very-large value (a
+Combines five signals, all log-dampened so no single very-large value (a
 mega-popular link target, a huge article) dominates the score:
 
-- word_count      -- how much substantive content the article has
-- link_count       -- how well-connected the article is (outgoing)
-- importance       -- sum of how often the article's outgoing links are
-                       themselves referenced elsewhere in the corpus
-- incoming_links    -- how often *this* article is linked to by others
-                       (an in-corpus proxy for popularity)
-- pageviews         -- real external pageview counts, if available (see
-                       `selection/pageviews.py`); 0 otherwise
+- word_count: how much substantive content the article has
+- link_count: how well-connected the article is (outgoing)
+- importance: sum of how often the article's outgoing links are
+  themselves referenced elsewhere in the corpus
+- incoming_links: how often this article is linked to by others
+  (an in-corpus proxy for popularity)
+- pageviews: real external pageview counts, if available (see
+  `selection/pageviews.py`); 0 otherwise
 
 Weights are read from config (`config/default.yaml: selection.weights`)
-rather than hardcoded, so they can be tuned and the choice documented in the
-project report instead of living as invisible magic numbers.
+rather than hardcoded, so they can be tuned independently of the code.
 """
 
 from __future__ import annotations

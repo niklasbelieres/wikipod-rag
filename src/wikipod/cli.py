@@ -101,7 +101,7 @@ def index(recreate_index: bool, workers: int, no_cache: bool) -> None:
     link-frequency map has to finish before any article's importance score
     can be computed), so both passes stream through the same on-disk JSONL
     cache (see `stream_articles_metadata_cached`) instead of materializing
-    the full corpus in memory -- the first call populates the cache while
+    the full corpus in memory: the first call populates the cache while
     yielding, the second is then a cheap disk read.
     """
     config = get_config()

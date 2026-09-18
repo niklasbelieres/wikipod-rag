@@ -35,18 +35,17 @@ def link_frequency_map(
 ) -> dict[str, int]:
     """Count how often each link target is referenced across the corpus.
 
-    Accepts any iterable, not just a list -- notably a generator/streaming
+    Accepts any iterable, not just a list, notably a generator/streaming
     source (see `analysis.reader.stream_articles_metadata_cached`), so a
     full-corpus pass never needs every article's full metadata held in
     memory at once, just this function's own running counter.
 
     `on_progress`, if given, is called every 5000 articles as
-    `on_progress(articles_processed, unique_link_targets_so_far)` --
-    diagnostic hook to see whether the counter's *key count* keeps growing
-    roughly linearly with corpus size (concerning: the dict itself could be
-    the memory driver) or flattens out (the more expected shape, since
-    popular link targets get "discovered" early and later articles mostly
-    just bump existing counts rather than adding new keys).
+    `on_progress(articles_processed, unique_link_targets_so_far)`, to check
+    whether the counter's key count grows roughly linearly with corpus size
+    (would indicate the dict itself is a memory driver) or flattens out (the
+    expected shape, since popular link targets get discovered early and
+    later articles mostly bump existing counts rather than add new keys).
     """
     counter: Counter[str] = Counter()
     for i, article in enumerate(articles, start=1):

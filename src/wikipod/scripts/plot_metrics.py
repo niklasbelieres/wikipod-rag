@@ -23,7 +23,7 @@ def _values(rows: list[dict[str, str]], key: str) -> list[float]:
 
 def _optional_values(rows: list[dict[str, str]], key: str) -> list[float]:
     """Like `_values`, but for Pi-only columns (cpu_temp_c, throttled) that
-    are empty strings on non-Pi hardware (e.g. the build server) -- skips
+    are empty strings on non-Pi hardware (e.g. the build server). Skips
     rows where the value is missing instead of raising."""
     return [float(row[key]) for row in rows if row.get(key)]
 

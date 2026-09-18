@@ -1,16 +1,15 @@
 """Benchmarks the configured embedding model in isolation from OpenSearch.
 
-Measures two distinct numbers the report asks for (see chapter 4, indexing):
+Measures two numbers (see report chapter 4, indexing):
   - bulk throughput (chunks/second), matching the batch encode() used during
     `wikipod index` for the whole corpus
   - single-query latency (ms/query), matching the batch-size-1 encode() used
     on the retrieval hot path in `rag/retriever.py`
 
-Deliberately does not touch the ZIM, OpenSearch, or the real chunking
-pipeline -- this isolates model inference time from I/O/network overhead, so
-the numbers reflect the embedding model's own cost on this hardware, not the
-rest of the indexing pipeline (see `measure_corpus_size.py`/`analyze_scoring.py`
-for corpus-dependent numbers instead).
+Does not touch the ZIM, OpenSearch, or the real chunking pipeline, so the
+numbers reflect the embedding model's own cost on this hardware rather than
+I/O/network overhead (see `measure_corpus_size.py`/`analyze_scoring.py` for
+corpus-dependent numbers instead).
 
 Usage:
     WIKIPOD_ENV=server python -m wikipod.scripts.benchmark_embedding
@@ -27,7 +26,7 @@ from wikipod.embeddings.embedder import Embedder
 N_BULK_CHUNKS = 1000
 N_QUERY_REPS = 30
 
-# Rough English word list to build synthetic chunk text from -- exact content
+# Rough English word list to build synthetic chunk text from. Exact content
 # doesn't matter for a throughput benchmark, only realistic length does.
 _WORDS = (
     "wikipedia article history politics science culture technology society "
@@ -46,7 +45,7 @@ def main() -> None:
 
     print(f"Model: {config.embeddings.model_name}  (batch_size={embedder.batch_size})")
 
-    # -- Bulk throughput (chunks/second), matching config.chunking.max_words --
+    # Bulk throughput (chunks/second), matching config.chunking.max_words.
     chunk_texts = [
         _fake_text(config.chunking.max_words, rng) for _ in range(N_BULK_CHUNKS)
     ]
@@ -62,7 +61,7 @@ def main() -> None:
         f"in {elapsed:.2f}s -> {N_BULK_CHUNKS / elapsed:.1f} chunks/s"
     )
 
-    # -- Single-query latency (ms/query), batch size 1 like retrieval time --
+    # Single-query latency (ms/query), batch size 1 like retrieval time.
     sample_query = _fake_text(8, rng)
 
     embedder.embed_query(sample_query)  # warmup

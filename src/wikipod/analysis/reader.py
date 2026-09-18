@@ -18,7 +18,7 @@ from wikipod.analysis.models import Article, ArticleMetadata
 
 logger = logging.getLogger(__name__)
 
-# -- basic, sequential ZIM-Reader --
+# Sequential ZIM reading.
 def _validate_zim_path(zim_path: Path) -> None:
     if not zim_path.exists():
         raise FileNotFoundError(f"File {zim_path} does not exist")
@@ -61,7 +61,7 @@ def is_html_redirect(html: str) -> bool:
     """Detect meta-refresh redirect pages that libzim doesn't flag as redirects itself."""
     return 'http-equiv="refresh"' in html and "URL=" in html
 
-# -- Extraction of a single article --
+# Single-article extraction.
 def _extract_one(
     archive: Archive, article_id: int, include_sections: bool
 ) -> ArticleMetadata | None:
@@ -80,7 +80,7 @@ def _extract_one(
     article = Article(article_id=article_id, title=entry.title, html=html)
     return extract_metadata(article, include_sections=include_sections)
 
-# -- parallel, lightweight article extraction (include_sections=False) -- 
+# Parallel metadata extraction (lightweight pass, include_sections=False).
 def _extract_metadata_range(
     zim_path: str,
     start: int,
@@ -128,18 +128,14 @@ def iter_articles_metadata_parallel(
     """Read every non-redirect article and extract its metadata, in parallel,
     yielding each one as it arrives rather than accumulating a list.
 
-    Same skip-and-log behavior as `iter_articles` + `extract_metadata`
-    combined, just split across `workers` processes.
+    Combines the skip-and-log behavior of `iter_articles` and
+    `extract_metadata`, split across `workers` processes. Work is divided
+    into `batch_size`-sized chunks rather than `workers` equal shares, so
+    each worker holds only one batch's `ArticleMetadata` objects at a time.
 
-    Work is split into many small `batch_size`-sized chunks (not just
-    `workers` equal-sized ones) so a `ProcessPoolExecutor` worker only ever
-    holds one batch's `ArticleMetadata` objects in memory at a time.
-    `ProcessPoolExecutor` automatically hands out the next batch as each
-    worker finishes one.
-
-    `include_sections=False` for a full-corpus pass:
-    it drops each article's full body text (see `analysis.metadata.extract_metadata`). 
-    Re-fetch full text for just the selected subset afterwards with
+    Use `include_sections=False` for a full-corpus pass to drop each
+    article's body text (see `analysis.metadata.extract_metadata`), then
+    re-fetch full text for the selected subset with
     `read_articles_metadata_for_ids`.
     """
     zim_path = Path(zim_path)
@@ -188,8 +184,8 @@ def read_articles_metadata_parallel(
 ) -> list[ArticleMetadata]:
     """`iter_articles_metadata_parallel`, materialized as a list.
 
-    Works well for small and medium ZIM-files. For a full en-dump, the system
-    ran out of memory.
+    Fine for small and medium ZIM files; a full en-dump exceeds available
+    memory this way.
     """
     return list(
         iter_articles_metadata_parallel(
@@ -206,16 +202,15 @@ def _reintern_in_main_process(article: ArticleMetadata) -> None:
     """Re-intern `links`/`categories` after crossing a process boundary.
 
     `sys.intern()` inside a worker (see `analysis.html_utils`) only
-    deduplicates strings within *that* worker's own interpreter -- results
-    shipped back via `ProcessPoolExecutor`'s pickling get deserialized as
-    fresh string objects in the main process, undoing the worker-local
-    sharing. Re-interning here restores full-corpus-wide deduplication
-    across *all* workers' contributions, not just within each one.
+    deduplicates strings within that worker's own interpreter. Pickling
+    results back through `ProcessPoolExecutor` deserializes them as fresh
+    string objects, undoing the worker-local sharing. Re-interning here
+    restores deduplication across all workers' contributions.
     """
     article.links = [sys.intern(link) for link in article.links]
     article.categories = [sys.intern(category) for category in article.categories]
 
-# -- parallel metadata extraction for specified ids
+# Parallel metadata extraction for a specific set of ids.
 def _extract_metadata_for_ids(
     zim_path: str, article_ids: list[int]
 ) -> list[ArticleMetadata]:
@@ -241,11 +236,11 @@ def read_articles_metadata_for_ids(
 ) -> list[ArticleMetadata]:
     """Full extraction (with section text) for a specific, known set of article_ids.
 
-    Meant to run *after* selection, on `result.selected`'s article_ids -- the
+    Meant to run after selection, on `result.selected`'s article_ids. The
     initial full-corpus pass uses `include_sections=False` to stay within
-    memory on the full corpus, so the selected subset needs its full text
-    fetched separately before it can be chunked. Only touches the given IDs
-    directly (`archive._get_entry_by_id`), not the rest of the corpus.
+    memory, so the selected subset needs its full text fetched separately
+    before chunking. Only touches the given IDs directly
+    (`archive._get_entry_by_id`), not the rest of the corpus.
     """
     zim_path = Path(zim_path)
     _validate_zim_path(zim_path)
@@ -263,7 +258,7 @@ def read_articles_metadata_for_ids(
 
     return articles
 
-# -- Caching with JSONL and Streaming --
+# JSONL caching with streaming read/write.
 def _jsonl_cache_meta_path(cache_path: Path) -> Path:
     return cache_path.with_name(cache_path.name + ".meta.json")
 
@@ -302,17 +297,15 @@ def stream_articles_metadata_cached(
     batch_size: int = METADATA_BATCH_SIZE,
 ) -> Iterator[ArticleMetadata]:
     """JSONL-backed streaming cache: yields one `ArticleMetadata` at a time,
-    never holding the full corpus in memory -- the full-corpus counterpart to
-    `read_articles_metadata_cached` (which materializes a list, fine for
-    smaller ZIMs but not for the full en.wikipedia corpus).
+    never holding the full corpus in memory.
 
     On a cache hit (same ZIM size/mtime and `include_sections` as recorded in
     the `<cache_path>.meta.json` sidecar), streams straight from `cache_path`
-    -- cheap, no HTML re-parsing. On a miss, runs the parallel extraction and
-    writes each article to `cache_path` as it's yielded (write-through), so
-    building `link_frequency_map` and then scoring -- both need a full pass,
-    see `selection.selector.select_within_budget` -- means calling this
-    twice, and the second call is always a cheap disk read regardless of
+    with no HTML re-parsing. On a miss, runs the parallel extraction and
+    writes each article to `cache_path` as it's yielded (write-through).
+    Building `link_frequency_map` and then scoring both need a full pass
+    (see `selection.selector.select_within_budget`), so this gets called
+    twice; the second call is always a cheap disk read regardless of
     whether the first call populated the cache or found it already valid.
     """
     zim_path = Path(zim_path)

@@ -2,7 +2,7 @@
 
 `storage_budget_mb` in config/*.yaml is checked against each article's
 `html_size_bytes` (raw HTML, see selection/selector.py), not the ZIM file's
-own (compressed) size on disk -- so the ZIM file size is only a weak proxy
+own (compressed) size on disk, so the ZIM file size is only a weak proxy
 for how large a budget makes sense. This script sums the real figure and
 suggests a few budget options as a starting point.
 
