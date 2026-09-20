@@ -152,6 +152,20 @@ The project is currently focused on evaluation, deployment measurements, and fin
 
 ## Evaluation
 
+Retrieval evaluation deduplicates chunks by article title, retaining the first
+chunk per article in the latest search result's ranked order. It starts with
+`4 * k` candidates and doubles the requested count until it finds `k` distinct
+articles, the backend returns fewer hits than requested, or it reaches the
+1,000-candidate limit (`MAX_RETRIEVAL_CANDIDATES` in `run_eval.py`).
+
+If the limit is reached without enough distinct articles, a warning identifies
+the query and the number found. Metrics use the available articles without
+padding; Precision@k still divides by the requested `k`. Relevant articles beyond
+the candidate limit may be missed, so results are bounded-search measurements,
+not a guarantee of the top-k distinct articles across the entire index. A shorter
+backend response ends the search but does not prove exhaustive coverage of an
+approximate nearest-neighbor index. Compared runs should use the same limit.
+
 WikiPod includes a retrieval evaluation workflow based on a fixed YAML dataset of natural-language queries and relevant Wikipedia article titles. The current evaluation reports metrics such as **Recall@k** and **reciprocal rank** so retrieval changes can be compared against a reproducible baseline.
 
 For local evaluation, a small `wikipedia_en_100` ZIM can be used to build a fast test index. Pi-specific runs can use `config/pi-test.yaml` so the default development configuration does not need to be modified for each experiment.

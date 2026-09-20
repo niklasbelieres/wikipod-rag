@@ -8,7 +8,7 @@ import multiprocessing
 import os
 import sys
 from collections.abc import Callable, Iterator
-from concurrent.futures import ProcessPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from pathlib import Path
 
 from libzim.reader import Archive
@@ -126,12 +126,18 @@ def iter_articles_metadata_parallel(
     include_sections: bool = True,
 ) -> Iterator[ArticleMetadata]:
     """Read every non-redirect article and extract its metadata, in parallel,
-    yielding each one as it arrives rather than accumulating a list.
+    yielding articles from completed batches in completion order.
 
-    Combines the skip-and-log behavior of `iter_articles` and
-    `extract_metadata`, split across `workers` processes. Work is divided
-    into `batch_size`-sized chunks rather than `workers` equal shares, so
-    each worker holds only one batch's `ArticleMetadata` objects at a time.
+    At most one batch per worker is submitted at a time, including completed
+    results waiting for consumption. A replacement is submitted only after a
+    batch has been fully yielded and its result list released. Batch ranges
+    are generated lazily. Memory retained by this iterator is therefore bounded
+    by workers * batch_size articles, whose sizes vary; consumers may retain
+    additional articles. Worker-side extraction and serialization also use memory.
+
+    Individual article failures are logged and skipped by the worker; batch
+    failures propagate. Progress counts extracted entries (including skips),
+    so it may lead consumption and updates pause while the consumer is paused.
 
     Use `include_sections=False` for a full-corpus pass to drop each
     article's body text (see `analysis.metadata.extract_metadata`), then
@@ -141,33 +147,46 @@ def iter_articles_metadata_parallel(
     zim_path = Path(zim_path)
     _validate_zim_path(zim_path)
 
-    workers = workers or os.cpu_count() or 1
+    workers = (os.cpu_count() or 1) if workers is None else workers
+    if workers < 1 or batch_size < 1:
+        raise ValueError("workers and batch_size must be positive")
     total = Archive(str(zim_path)).article_count
-    ranges = [(i, min(i + batch_size, total)) for i in range(0, total, batch_size)]
+    starts = iter(range(0, total, batch_size))
 
     with multiprocessing.Manager() as manager:
         counter = manager.Value("i", 0)
         lock = manager.Lock()
 
         with ProcessPoolExecutor(max_workers=workers) as pool:
-            pending = {
-                pool.submit(
-                    _extract_metadata_range,
-                    str(zim_path),
-                    start,
-                    end,
-                    counter,
-                    lock,
-                    include_sections=include_sections,
-                )
-                for start, end in ranges
-            }
+            pending = set()
+
+            def submit_next_batch() -> None:
+                start = next(starts, None)
+                if start is not None:
+                    pending.add(pool.submit(
+                        _extract_metadata_range,
+                        str(zim_path),
+                        start,
+                        min(start + batch_size, total),
+                        counter,
+                        lock,
+                        include_sections=include_sections,
+                    ))
+
+            for _ in range(workers):
+                submit_next_batch()
             while pending:
-                done, pending = wait(pending, timeout=1.0)
-                for future in done:
-                    for article in future.result():
+                done, pending = wait(pending, timeout=1.0, return_when=FIRST_COMPLETED)
+                while done:
+                    future = done.pop()
+                    articles = future.result()
+                    for article in articles:
                         _reintern_in_main_process(article)
                         yield article
+                    # Futures retain their result lists too: release both references
+                    # before replenishing the bounded set of submitted batches.
+                    del articles, future
+                    submit_next_batch()
                 if on_progress is not None:
                     on_progress(counter.value, total)
 

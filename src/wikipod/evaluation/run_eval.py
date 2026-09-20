@@ -1,5 +1,6 @@
 import csv
 import json
+import logging
 from pathlib import Path
 
 import click
@@ -7,6 +8,7 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
+from wikipod.chunking.models import Chunk
 from wikipod.config import get_config
 from wikipod.embeddings.embedder import Embedder
 from wikipod.evaluation.llm_judge import LLMJudge
@@ -23,6 +25,8 @@ from wikipod.rag.generator import Generator
 from wikipod.rag.retriever import Retriever
 
 console = Console()
+logger = logging.getLogger(__name__)
+MAX_RETRIEVAL_CANDIDATES = 1000
 
 def load_eval_dataset(path) -> list[dict]:
     """Lädt die Query/relevant_titles-Paare aus der JSON/YAML-Datei."""    
@@ -36,25 +40,47 @@ def retrieve_unique_chunks(
     retriever: Retriever,
     query: str,
     k: int,
-) -> list:
-    """Return the first chunk for each of the top-k unique articles."""
-    chunks = retriever.retrieve(query, k=k * 4)
+    *,
+    max_candidates: int = MAX_RETRIEVAL_CANDIDATES,
+) -> list[Chunk]:
+    """Return up to k distinct articles in the latest retrieval's ranked order.
 
-    unique_chunks = []
-    seen_titles = set()
+    Start with 4*k candidates and double until enough articles are found, the
+    backend returns fewer hits than requested, or max_candidates is reached.
+    Deduplication uses article titles, matching the evaluation ground truth.
+    A capped search logs a warning: undiscovered articles can affect all metrics;
+    precision still uses the requested k as its denominator.
+    """
+    if k < 1:
+        raise ValueError("k must be positive")
+    if max_candidates < 1:
+        raise ValueError("max_candidates must be positive")
 
-    for chunk in chunks:
-        if chunk.article_title in seen_titles:
-            continue
+    candidate_count = min(k * 4, max_candidates)
+    while True:
+        chunks = retriever.retrieve(query, k=candidate_count)
+        # Rebuild for each request: approximate retrieval can change the ranking.
+        unique_chunks: list[Chunk] = []
+        seen_titles: set[str] = set()
+        for chunk in chunks:
+            if chunk.article_title in seen_titles:
+                continue
+            seen_titles.add(chunk.article_title)
+            unique_chunks.append(chunk)
+            if len(unique_chunks) == k:
+                return unique_chunks
 
-        seen_titles.add(chunk.article_title)
-        unique_chunks.append(chunk)
+        if candidate_count == max_candidates:
+            logger.warning(
+                "Retrieval candidate limit (%d) reached for query %r: found %d of %d "
+                "distinct articles. Evaluation may miss additional relevant articles.",
+                max_candidates, query, len(unique_chunks), k,
+            )
+            return unique_chunks
+        if len(chunks) < candidate_count:
+            return unique_chunks
+        candidate_count = min(candidate_count * 2, max_candidates)
 
-        if len(unique_chunks) == k:
-            break
-
-    return unique_chunks
-    
 
 
 def run_eval(
