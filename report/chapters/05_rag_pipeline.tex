@@ -16,7 +16,7 @@ die das resultierende Grounding-Verhalten des Systems veranschaulichen.
 \label{sec:prompt-konstruktion}
 
 Die Übersetzung von Anfrage und erhaltenen Chunks in einen an das Sprachmodell
-sendbaren Prompt übernimmt das Modul \texttt{rag/prompt\_builder.py}. Es enthält
+sendbaren Prompt übernimmt das Modul \texttt{rag/\allowbreak{}prompt\_\allowbreak{}builder.\allowbreak{}py}. Es enthält
 bewusst weder Modell-Ladelogik noch Netzwerk-I/O und lässt sich dadurch unabhängig
 von einem laufenden Backend testen. Das Ergebnis ist keine einzelne Zeichenkette,
 sondern eine Liste von Chat-Nachrichten der Form
@@ -27,7 +27,7 @@ Format erwarten und der Prompt-Builder dadurch backend-unabhängig bleibt.
 \paragraph{System-Prompt.} Jeder Anfrage wird derselbe System-Prompt vorangestellt:
 
 \begin{quote}
-\ttfamily\small
+\ttfamily\small\raggedright
 "You are an assistant answering questions using only the Wikipedia excerpts given
 below as context. Answer using only information contained in the excerpts. If the
 excerpts do not contain enough information to answer, say so explicitly instead of
@@ -44,12 +44,12 @@ sind Instruktionen an ein instruction-getuntes Sprachmodell; ihre Wirksamkeit h�
 entsprechend vom gewählten Modell ab (Abschnitt~\ref{sec:slm-auswahl}) und wird in
 Abschnitt~\ref{sec:beispielinteraktionen} anhand konkreter Beispiele eingeordnet.
 
-\paragraph{Kontextformatierung und Quellenattribution.} Die erhaltenen Chunks
+\subsubsection*{Kontextformatierung und Quellenattribution} Die erhaltenen Chunks
 werden über \texttt{format\_context()} zu einem nummerierten, quellenattributierten
 Textblock zusammengesetzt:
 
 \begin{quote}
-\ttfamily\small
+\ttfamily\small\raggedright
 [1] (Climate change - Causes) Human activity is the main driver...\\
 {[2]} (Climate change - Lead) Present-day climate change includes...
 \end{quote}
@@ -65,14 +65,14 @@ nachvollziehbar, ersetzt jedoch keine Prüfung, ob das Modell die Quellenangabe 
 korrekt zuordnet.
 
 \paragraph{Kontext-Budget.} Da erhaltenen Chunks in der Summe das Kontextfenster des
-Sprachmodells überschreiten können, begrenzt \texttt{\_fit\_to\_budget()} die
+Sprachmodells überschreiten können, begrenzt \texttt{\_\allowbreak{}fit\_\allowbreak{}to\_\allowbreak{}budget()} die
 tatsächlich in den Prompt aufgenommene Chunk-Menge auf ein Wortbudget von
-standardmäßig 800 Wörtern (\texttt{DEFAULT\_MAX\_CONTEXT\_WORDS}). Die Wortanzahl dient
+standardmäßig 800 Wörtern (\texttt{DEFAULT\_\allowbreak{}MAX\_\allowbreak{}CONTEXT\_\allowbreak{}WORDS}). Die Wortanzahl dient
 dabei als Näherung für die tatsächliche Token-Anzahl: Für englischsprachigen Text
 liegen gängige Tokenizer bei ungefähr 1,3 Token pro Wort, sodass 800 Wörter deutlich
 unterhalb des in \texttt{config.llm.n\_ctx} konfigurierten Kontextfensters von 4096
 Token bleiben. Der verbleibende Spielraum wird für den System-Prompt sowie die
-maximale Antwortlänge (\texttt{config.llm.max\_tokens}, standardmäßig 400 Token)
+maximale Antwortlänge (\texttt{config.\allowbreak{}llm.\allowbreak{}max\_\allowbreak{}tokens}, standardmäßig 400 Token)
 benötigt.
 
 Die Auswahl der tatsächlich in den Prompt aufgenommenen Chunks erfolgt greedy: Die
@@ -87,7 +87,7 @@ unter Umständen ebenfalls relevanten Chunks.
 \paragraph{Leere Retrieval-Ergebnisse.} Liefert der Retriever keine Chunks -- etwa bei
 einer Anfrage zu einem nicht im Index enthaltenen Thema --, wird der Prompt dennoch
 abgesendet. An die Stelle des Kontextblocks tritt dann der feste Hinweistext
-\texttt{No relevant excerpts were found in the indexed Wikipedia subset.} Ein
+\texttt{No relevant excerpts were found in the indexed Wikipedia subset.\allowbreak{}} Ein
 Sonderfall im Aufrufercode ist dafür nicht nötig, da der System-Prompt das Modell
 bereits anweist, in einer solchen Situation das Fehlen ausreichender Informationen zu
 benennen. Wie sich dieses Zusammenspiel in der Praxis auswirkt, wenn zwar keine
@@ -99,9 +99,9 @@ wird in Abschnitt~\ref{sec:beispielinteraktionen} diskutiert.
 \label{sec:slm-auswahl}
 
 Für die Textgenerierung wurden drei quantisierte, instruction-getunte Sprachmodelle
-im GGUF-Format evaluiert: \texttt{Qwen2.5-1.5B-Instruct}~\cite{qwen25-model-card},
-\texttt{Llama-3.2-1B-Instruct}~\cite{llama32-model-card} und
-\texttt{Phi-3.5-mini-instruct}~\cite{phi35-model-card}. Alle drei Kandidaten liegen im
+im GGUF-Format evaluiert: \texttt{Qwen2.\allowbreak{}5-\allowbreak{}1.\allowbreak{}5B-\allowbreak{}Instruct}~\cite{qwen25-model-card},
+\texttt{Llama-\allowbreak{}3.\allowbreak{}2-\allowbreak{}1B-\allowbreak{}Instruct}~\cite{llama32-model-card} und
+\texttt{Phi-\allowbreak{}3.\allowbreak{}5-\allowbreak{}mini-\allowbreak{}instruct}~\cite{phi35-model-card}. Alle drei Kandidaten liegen im
 Q4\_K\_M-Quantisierungsformat vor, einer 4-Bit-Gewichtsquantisierung, die von der für
 die CPU-only-Inferenz auf dem Raspberry Pi eingesetzten
 \texttt{llama.cpp}-Bibliothek~\cite{llamacpp-repo} unterstützt wird und gegenüber der
@@ -115,7 +115,8 @@ vorgesehen.
     \centering
     \caption{Verglichene Sprachmodelle}
     \label{tab:slm-vergleich}
-    \begin{tabular}{lrrrl}
+    \small\setlength{\tabcolsep}{4pt}
+    \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{3cm}r>{\raggedleft\arraybackslash}p{2.5cm}r>{\raggedright\arraybackslash}X@{}}
         \toprule
         Modell & Parameter & Kontextfenster & Größe (Q4\_K\_M) & Lizenz \\
         \midrule
@@ -123,7 +124,7 @@ vorgesehen.
         Qwen2.5 1.5B Instruct   & 1,54 Mrd. & 32.768 Token  & 1,1 GB & Apache 2.0 \\
         Phi-3.5 Mini Instruct   & 3,8 Mrd.  & 128.000 Token & 2,3 GB & MIT \\
         \bottomrule
-    \end{tabular}
+    \end{tabularx}
 \end{table}
 
 Die in Tabelle~\ref{tab:slm-vergleich} angegebenen Kontextfenster sind die von den
@@ -171,8 +172,8 @@ Diese Beobachtungen beruhen auf einer kleinen, nicht systematisch ausgewerteten
 Stichprobe einzelner Antworten und ersetzen keine quantitative Qualitätsbewertung;
 sie werden hier ausschließlich als Begründung für die getroffene Auswahlentscheidung
 angeführt. In der Zusammenschau aus gemessener Latenz und den beschriebenen
-qualitativen Beobachtungen wurde \texttt{Qwen2.5-1.5B-Instruct} als Standardmodell für
-\texttt{config/default.yaml} und \texttt{config/prod.yaml} übernommen: Es erreichte in
+qualitativen Beobachtungen wurde \texttt{Qwen2.\allowbreak{}5-\allowbreak{}1.\allowbreak{}5B-\allowbreak{}Instruct} als Standardmodell für
+\texttt{config/\allowbreak{}default.\allowbreak{}yaml} und \texttt{config/prod.yaml} übernommen: Es erreichte in
 Kapitel~\ref{ch:evaluation} die niedrigste gemessene Generierungslatenz der drei
 Kandidaten, produzierte in der hier beschriebenen Stichprobe durchgehend prägnante,
 inhaltlich mit den beiden anderen Modellen übereinstimmende Antworten und wies dabei
@@ -198,7 +199,7 @@ zwischen den Backends unterscheiden muss. Welches Backend verwendet wird, legt
     \item \texttt{'llama\_cpp'}: Lädt eine lokale GGUF-Datei direkt über die
     \texttt{llama-cpp-python}-Bindung (eine optionale Abhängigkeit, siehe das
     \texttt{[llm]}-Extra in \texttt{pyproject.toml}) und ruft
-    \texttt{create\_chat\_completion()} mit den konfigurierten Werten für
+    \texttt{create\_\allowbreak{}chat\_\allowbreak{}completion()} mit den konfigurierten Werten für
     \texttt{max\_tokens} und \texttt{temperature} auf. Dieses Backend läuft ohne
     separaten Server-Prozess und entspricht damit dem für die Zielhardware
     vorgesehenen Deployment: In \texttt{config/prod.yaml} ist ausschließlich dieses
@@ -208,7 +209,7 @@ zwischen den Backends unterscheiden muss. Welches Backend verwendet wird, legt
     Generierungsparameter als JSON-Body. Da für dieses Backend lediglich
     \texttt{ollama pull <modell>} statt eines manuellen GGUF-Downloads und Kompilierens
     von \texttt{llama-cpp-python} nötig ist, wird es in \texttt{config/dev.yaml} und
-    \texttt{config/pi-test.yaml} für die lokale Entwicklung beziehungsweise einen
+    \texttt{config/\allowbreak{}pi-\allowbreak{}test.\allowbreak{}yaml} für die lokale Entwicklung beziehungsweise einen
     Testlauf im mittleren Maßstab verwendet.
 \end{itemize}
 
@@ -217,10 +218,10 @@ Abschnitt~\ref{sec:prompt-konstruktion} beschriebene Nachrichtenformat, sodass e
 Wechsel des Backends -- etwa von \texttt{ollama} während der Entwicklung zu
 \texttt{llama\_cpp} auf dem Raspberry Pi -- keine Änderung an Prompt-Konstruktion oder
 Retrieval erfordert. Das Laden eines GGUF-Modells über \texttt{llama\_cpp} ist der mit
-Abstand teuerste Teil der Backend-Initialisierung; \texttt{\_load\_llama\_cpp\_model()}
+Abstand teuerste Teil der Backend-Initialisierung; \texttt{\_\allowbreak{}load\_\allowbreak{}llama\_\allowbreak{}cpp\_\allowbreak{}model()}
 cached daher analog zum in Kapitel~\ref{ch:indexierung} beschriebenen Embedding-Modell
 die geladene \texttt{Llama}-Instanz pro Kombination aus Modellpfad und Kontextgröße
-(\texttt{@lru\_cache(maxsize=2)}), sodass ein Modell innerhalb eines Prozesses nur
+(\texttt{@lru\_\allowbreak{}cache(maxsize=2)}), sodass ein Modell innerhalb eines Prozesses nur
 einmal geladen werden muss. Fehlt die konfigurierte GGUF-Datei, bricht der
 \texttt{llama\_cpp}-Pfad mit einer aussagekräftigen Fehlermeldung ab, die sowohl auf
 eine Bezugsquelle für das Modell als auch auf die Möglichkeit verweist, für die lokale
@@ -234,7 +235,7 @@ Anhand einer Anfrage aus dem regulären Evaluationsdatensatz
 (Kapitel~\ref{ch:evaluation}) lässt sich das Grounding-Verhalten des Systems
 konkret nachvollziehen. Auf die Anfrage \textit{"Which South African anti-apartheid
 activist spent 27 years in prison before becoming the country's first black
-president?"} lieferte das mit \texttt{Qwen2.5-1.5B-Instruct} generierte System die
+president?"} lieferte das mit \texttt{Qwen2.\allowbreak{}5-\allowbreak{}1.\allowbreak{}5B-\allowbreak{}Instruct} generierte System die
 Antwort:
 
 \begin{quote}
@@ -252,12 +253,12 @@ stammenden, nicht mit einer Quelle belegten Wissensstand zurückzugreifen.
 Für den in der Aufgabenstellung ebenfalls geforderten negativen Fall -- eine Anfrage zu
 einem nicht im indexierten Bestand enthaltenen Thema -- enthält der in
 Kapitel~\ref{ch:evaluation} beschriebene Edge-Case-Datensatz
-(\texttt{test/data/eval\_edge\_case\_queries.yaml}) die als \texttt{out\_of\_scope}
+(\texttt{test/\allowbreak{}data/\allowbreak{}eval\_\allowbreak{}edge\_\allowbreak{}case\_\allowbreak{}queries.\allowbreak{}yaml}) die als \texttt{out\_of\_scope}
 markierte Anfrage \texttt{Tell me about Albert Einstein}, für die keine relevanten
 Ground-Truth-Titel hinterlegt sind. Die dort dokumentierte Retrieval-Auswertung zeigt,
 dass für diese Anfrage keine leere Trefferliste zurückgegeben wird, sondern
 inhaltlich nicht einschlägige Chunks -- unter anderem zum Artikel \texttt{Martin
-Luther King Jr.} Für diesen konkreten Fall greift somit nicht die in
+Luther King Jr.\allowbreak{}} Für diesen konkreten Fall greift somit nicht die in
 Abschnitt~\ref{sec:prompt-konstruktion} beschriebene Fallback-Behandlung für leere
 Retrieval-Ergebnisse, sondern es liegt am System-Prompt selbst, anhand eines
 inhaltlich unpassenden, aber nicht leeren Kontextblocks zu erkennen, dass die

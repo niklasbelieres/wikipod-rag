@@ -1,3 +1,6 @@
+\par\addvspace{1em}
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \chapter{Systemarchitektur}
 \label{ch:architektur}
 
@@ -24,6 +27,8 @@ verwendet werden. Die Kommandozeilenschnittstelle des Projekts ist mit
 \texttt{Click} umgesetzt und nutzt \texttt{Rich} für strukturierte
 Terminalausgaben. Konfigurationen werden mit \texttt{PyYAML} eingelesen und über
 \texttt{Pydantic}-Modelle validiert.
+
+\end{minipage}\par\addvspace{1em}
 
 \section{Pipeline-Überblick}
 
@@ -202,6 +207,9 @@ lokalen Systemumgebung.
     \label{fig:pipeline}
 \end{figure}
 
+\par\addvspace{1em}
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \section{Projektstruktur und Konfiguration}
 
 Die Implementierung von WikiPod ist als Python-Paket aufgebaut und gliedert die
@@ -216,7 +224,7 @@ Bericht.
 \emergencystretch=1em
 Ein zentraler Bestandteil der Projektstruktur ist die konfigurationsbasierte
 Steuerung des Systems. Allgemeine Standardwerte werden in
-\texttt{config/default.yaml} definiert und können durch umgebungsspezifische
+\texttt{config/\allowbreak{}default.\allowbreak{}yaml} definiert und können durch umgebungsspezifische
 Konfigurationsdateien überschrieben werden. Dadurch lassen sich beispielsweise
 Entwicklungs-, Test- und produktive Indexierungsläufe mit unterschiedlichen
 Ressourcenbudgets und Parametern durchführen, ohne dafür Änderungen am
@@ -236,4 +244,4 @@ WikiPod insbesondere deshalb relevant, weil sich geeignete Einstellungen
 zwischen Entwicklungsumgebung und Zielhardware deutlich unterscheiden können.
 Die für einen konkreten Lauf verwendeten Parameter bleiben auf diese Weise
 nachvollziehbar und können für Evaluationen reproduziert und dokumentiert
-werden.
+werden.\end{minipage}\par\addvspace{1em}

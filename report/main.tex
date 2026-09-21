@@ -22,19 +22,25 @@
 %  10 Fazit & Ausblick        ~1 Seite
 % =============================================================================
 
-\documentclass[a4paper,11pt,twoside]{scrreprt}
+\documentclass[a4paper,11pt,oneside,openany]{scrreprt}
 
 % -- Sprache & Encoding --------------------------------------------------------
 \usepackage[utf8]{inputenc}
 \usepackage[ngerman]{babel}
 \usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
 \usepackage[autostyle, german=quotes]{csquotes}
 \usepackage{amsopn}
 
 % -- Seitenlayout ---------------------------------------------------------------
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{setspace}
-\onehalfspacing
+\setstretch{1.3}
+\setlength{\emergencystretch}{1.5em}
+\clubpenalty=10000
+\widowpenalty=10000
+\displaywidowpenalty=10000
 
 % -- Grafiken & Abbildungen ------------------------------------------------------
 \usepackage{graphicx}
@@ -47,6 +53,7 @@
 % -- Tabellen ---------------------------------------------------------------------
 \usepackage{booktabs}
 \usepackage{array}
+\usepackage{tabularx}
 
 % -- Code-Listings (z. B. CLI-Aufrufe, Config-Ausschnitte, Python-Snippets) --------
 \usepackage{listings}
@@ -54,6 +61,9 @@
 \lstset{
     basicstyle=\ttfamily\small,
     breaklines=true,
+    showstringspaces=false,
+    columns=fullflexible,
+    keepspaces=true,
     frame=single,
     numbers=left,
     numberstyle=\tiny,
@@ -72,11 +82,11 @@
 \addbibresource{references.bib}
 
 % -- Links & Querverweise (immer als letztes Paket laden) --------------------------
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
 \usepackage{cleveref}
 
 % -- TODOs waehrend des Schreibens sichtbar markieren (vor der Abgabe entfernen) ---
-\usepackage[colorinlistoftodos]{todonotes}
+\usepackage[disable]{todonotes}
 
 \title{
     WikiPod: Dokumentenauswahl und Retrieval-Augmented-Generation\\
@@ -87,44 +97,85 @@
     Niklas Levin Bélières \and
     Luca Britten
 }
-\date{\today}
+\date{}
 
 \begin{document}
 
 \maketitle
 
-\begin{abstract}
-    % 150-250 Woerter: Problemstellung (Offline-Zugang zu Wikipedia auf
-    % eingeschraenkter Hardware), Ansatz (Auswahl + Vektorindex + RAG),
-    % wichtigste Ergebnisse in Kurzform. Am besten ganz zum Schluss
-    % schreiben, wenn der Rest steht.
-    \todo[inline]{Abstract zuletzt schreiben.}
-\end{abstract}
+\chapter*{Abstract}
+WikiPod untersucht den lokalen Zugriff auf ausgewählte Inhalte der
+englischsprachigen Wikipedia ohne Internetverbindung auf einem Raspberry Pi~5
+mit 16~GB Arbeitsspeicher. Dafür wurde eine Pipeline entwickelt, die Artikel
+aus einer lokalen ZIM-Datei anhand von Metadaten und Struktursignalen unter
+einem vorgegebenen Speicherbudget auswählt. Die ausgewählten Texte werden
+abschnittsweise zerlegt, mit einem Embedding-Modell in dichte Vektoren
+überführt und in OpenSearch indexiert. Zu natürlichsprachlichen Anfragen
+abgerufene Textpassagen dienen einem lokalen Sprachmodell als Kontext für
+die Antwortgenerierung mittels Retrieval-Augmented Generation. Die aufwendige
+Indexierung des großen Korpus erfolgt auf einem Server; der fertige Index
+wird anschließend auf die Zielhardware übertragen.
+
+Im produktiven Selektionslauf wurden rund 1,64 Millionen von 7,32 Millionen
+Kandidatenartikeln ausgewählt. Auf einem separaten kleinen Evaluationskorpus
+erreichte das Retrieval für 20 reguläre Anfragen bei fünf betrachteten
+Artikeln einen mittleren Recall von $1{,}000$, einen nDCG von $0{,}963$ und
+einen Mean Reciprocal Rank von $0{,}950$. Auf zwölf zusätzlichen
+Edge-Case-Anfragen erhöhte die Query-Normalisierung den Recall von
+$0{,}833$ auf $0{,}917$. Unter drei auf dem Raspberry Pi verglichenen
+Sprachmodellen erzielte Qwen2.5~1.5B~Q4 mit durchschnittlich $27{,}97$~s
+die niedrigste gemessene Generierungslatenz.
+
+Die Ergebnisse zeigen die grundsätzliche Umsetzbarkeit des lokalen Ansatzes.
+Einschränkungen bestehen durch die kleinen, manuell zusammengestellten
+Evaluationsdatensätze, die unausgewogenen Beiträge der Auswahlsignale und
+die hohe Generierungsdauer. Die Qualität der generierten Antworten wurde
+im Modellvergleich nicht quantitativ bewertet.
+
 
 \tableofcontents
+\clearpage
+\begingroup
+\let\clearpage\relax
 \listoffigures
 \listoftables
+\endgroup
 
 % Optional, falls ihr ein Abkuerzungsverzeichnis wollt -- siehe acronyms.tex
 % \input{chapters/00_acronyms}
 
-\include{chapters/01_einleitung}
-\include{chapters/02_architektur}
-\include{chapters/03_dokumentenauswahl}
-\include{chapters/04_indexierung}
-\include{chapters/05_rag_pipeline}
-\include{chapters/06_deployment}
-\include{chapters/07_evaluation}
-\include{chapters/08_anleitung}
-\include{chapters/09_diskussion}
-\include{chapters/10_fazit}
-
+\clearpage
+% Chapters flow to avoid nearly empty chapter-ending pages.
+\RedeclareSectionCommand[style=section,indent=0pt,
+  beforeskip=-4ex plus -1ex minus -.2ex,
+  afterskip=2.5ex plus .2ex]{chapter}
+\input{chapters/01_einleitung}
+\input{chapters/02_architektur}
+\input{chapters/03_dokumentenauswahl}
+\input{chapters/04_indexierung}
+\input{chapters/05_rag_pipeline}
+\input{chapters/06_deployment}
+\input{chapters/07_evaluation}
+\input{chapters/08_anleitung}
+\input{chapters/09_diskussion}
 \begingroup
+\setstretch{1.22}
+\input{chapters/10_fazit}
+\par
+\endgroup
+
+\clearpage
+\begingroup
+\small
+\singlespacing
 \raggedright
 \printbibliography
 \endgroup
 
+\clearpage
 \appendix
-\include{chapters/a1_anhang}
+\small
+\singlespacing
+\input{chapters/a1_anhang}
 
 \end{document}

@@ -1,3 +1,6 @@
+\par\addvspace{1em}
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \chapter{Vektorindexierung mit OpenSearch}
 \label{ch:indexierung}
 
@@ -31,13 +34,15 @@ zugehörigen Wikipedia-Abschnitts. Diese werden im weiteren Verlauf der Pipeline
 der abgerufenen Textpassagen im Prompt kenntlich zu machen und eine Quellenattribution zu ermöglichen.
 
 
+\end{minipage}\par\addvspace{1em}
+
 \section{Embedding-Modell}
 \label{sec:embedding-modell}
 
-Als Embedding-Modell kommt \texttt{sentence-transformers/all-MiniLM-L6-v2} zum Einsatz, welches jeden
+Als Embedding-Modell kommt \texttt{sentence-\allowbreak{}transformers/\allowbreak{}all-\allowbreak{}MiniLM-\allowbreak{}L6-\allowbreak{}v2} zum Einsatz, welches jeden
 Chunk-Text auf einen 384-dimensionalen dichten Vektor abbildet~\cite{minilm-model-card}. Mit 22,7 Millionen
 Parametern ist es deutlich kleiner als vergleichbare Modelle wie \texttt{all-mpnet-base-v2}. Die offizielle
-Dokumentation der \texttt{sentence-transformers}-Bibliothek beschreibt \texttt{all-MiniLM-L6-v2} als
+Dokumentation der \texttt{sentence-\allowbreak{}transformers}-Bibliothek beschreibt \texttt{all-MiniLM-L6-v2} als
 schnellere Alternative zu \texttt{all-mpnet-base-v2}, während letzteres eine höhere Qualität bei entsprechend
 höherem Rechenaufwand bietet~\cite{sbert-pretrained-models}.
 
@@ -58,7 +63,7 @@ begrenzt.
 Für die Indexierung und die spätere Abfrage wird dasselbe Embedding-Modell mit identischen Einstellungen
 verwendet. Sowohl \texttt{embed\_chunks()} als auch \texttt{embed\_query()} greifen auf dieselbe
 \texttt{Embedder}-Instanz mit aktivierter L2-Normalisierung
-(\texttt{normalize\_embeddings=True}) zurück. Dadurch werden Query- und Chunk-Vektoren im selben Vektorraum
+(\texttt{normalize\_\allowbreak{}embeddings=True}) zurück. Dadurch werden Query- und Chunk-Vektoren im selben Vektorraum
 repräsentiert. Bei L2-normalisierten Vektoren entspricht das Skalarprodukt der Kosinus-Ähnlichkeit, wodurch
 die Berechnung direkt mit dem im OpenSearch-Index verwendeten \texttt{cosinesimil}-Ähnlichkeitsmaß
 übereinstimmt (Abschnitt~\ref{sec:opensearch-index-design}).
@@ -117,7 +122,7 @@ auf das konfigurierte Speicherbudget reduzierte Teilmenge. Die aufwendige Zwei-P
 Chunking, Embedding und Indexierung laufen über eine von vornherein kleinere, budgetbeschränkte Artikelmenge.
 
 Im \texttt{index}-Kommando der CLI wird die Chunk-Liste für diese gesamte ausgewählte Teilmenge auf einmal aufgebaut, statt gestreamt zu werden. Erst 
-Embedding und Indexierung selbst laufen anschließend batchweise (in Schritten von \texttt{config.embeddings.batch\_size}, standardmäßig 32): Pro
+Embedding und Indexierung selbst laufen anschließend batchweise (in Schritten von \texttt{config.\allowbreak{}embeddings.\allowbreak{}batch\_\allowbreak{}size}, standardmäßig 32): Pro
 Durchlauf werden nur die Vektoren eines Batches berechnet und indexiert, nie die aller Chunks gleichzeitig.
 
 Dass die vollständig im Speicher gehaltene Chunk-Liste hier kein Problem darstellte, hat vor allem zwei Gründe: erstens ist die Teilmenge 

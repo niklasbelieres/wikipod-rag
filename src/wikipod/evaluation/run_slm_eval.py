@@ -72,6 +72,8 @@ def run_model(generator: Generator, prepared: list[dict]) -> list[dict]:
 
 
 def write_model_results(output_dir: Path, model_name: str, k: int, per_query: list[dict]) -> Path:
+    if not per_query:
+        raise ValueError("Cannot write model results without evaluated queries")
     model_dir = output_dir / Path(model_name).stem
     model_dir.mkdir(parents=True, exist_ok=True)
 
@@ -130,6 +132,12 @@ def write_model_results(output_dir: Path, model_name: str, k: int, per_query: li
 )
 def main(dataset_path: Path, models_dir: Path, top_k: int | None, output_dir: Path) -> None:
     """Run each .gguf model in MODELS_DIR against DATASET_PATH and record answers/latency."""
+    dataset = load_eval_dataset(dataset_path)
+    if not dataset:
+        raise click.BadParameter(
+            "Evaluation dataset must contain at least one query.", param_hint="--dataset"
+        )
+
     config = get_config()
     k = config.retrieval.top_k if top_k is None else top_k
 
@@ -137,7 +145,6 @@ def main(dataset_path: Path, models_dir: Path, top_k: int | None, output_dir: Pa
     client = build_client(config.opensearch)
     retriever = Retriever(client, config.opensearch.index_name, embedder, top_k=k)
 
-    dataset = load_eval_dataset(dataset_path)
     console.print(f"[bold]{len(dataset)} Queries geladen aus[/bold] {dataset_path}")
 
     prepared = prepare_queries(retriever, dataset, k)

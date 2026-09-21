@@ -41,3 +41,14 @@ def test_merged_configuration_validates_default_overlap(tmp_path, monkeypatch):
             get_config("test")
     finally:
         get_config.cache_clear()
+
+
+def test_report_evaluation_has_its_own_index():
+    get_config.cache_clear()
+    try:
+        development = get_config("dev")
+        evaluation = get_config("report_eval")
+        assert evaluation.opensearch.index_name == "wikipod-chunks-report-eval"
+        assert evaluation.opensearch.index_name != development.opensearch.index_name
+    finally:
+        get_config.cache_clear()

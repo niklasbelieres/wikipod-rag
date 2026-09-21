@@ -1,5 +1,7 @@
 \chapter{Anleitung: Inbetriebnahme}
 \label{ch:anleitung}
+\begingroup
+\lstset{showstringspaces=false}
 
 Dieses Kapitel beschreibt die grundlegenden Schritte zur Inbetriebnahme von
 WikiPod. Die Anleitung ist insbesondere als Einstiegspunkt für Folgeprojekte
@@ -8,11 +10,11 @@ Komponenten befinden sich in der README-Datei des Repositorys.
 
 \section{Voraussetzungen}
 
-Für die lokale Ausführung wird eine Python-Umgebung sowie Docker mit Docker
+Für die lokale Ausführung wird Python ab Version 3.11 sowie Docker mit Docker
 Compose benötigt. Die Anwendung verwendet OpenSearch für die Speicherung und
 Abfrage der erzeugten Vektorrepräsentationen. Für die Dokumentengrundlage wird
-außerdem eine lokale Wikipedia-ZIM-Datei benötigt. Diese ist aufgrund ihrer
-Größe nicht Bestandteil des Repositorys und muss separat bereitgestellt werden.
+außerdem eine lokale Wikipedia-ZIM-Datei benötigt. Der vollständige Korpus muss separat bereitgestellt werden; die kleine
+ZIM-Datei im Testverzeichnis dient lediglich den automatisierten Tests.
 
 Für den produktionsnahen Betrieb wurde im Projekt ein Raspberry Pi~5 mit
 16\,GB Arbeitsspeicher und einer 1-TB-SSD verwendet. Die grundlegenden
@@ -21,10 +23,17 @@ Entwicklungsrechner durchgeführt werden.
 
 \section{Installation}
 
+Die folgenden Befehle werden in einer Unix-Shell im Projektverzeichnis
+mit aktivierter virtueller Umgebung ausgeführt. Für die erstmalige Einrichtung
+werden eine Internetverbindung sowie Git benötigt.
+
 Nach dem Klonen des Repositorys wird zunächst eine virtuelle Python-Umgebung
 erstellt und anschließend das Projekt einschließlich der
 Entwicklungsabhängigkeiten installiert.
 
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \begin{lstlisting}[language=bash]
 git clone https://github.com/niklasbelieres/wikipod-rag
 cd wikipod-rag
@@ -33,48 +42,124 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 \end{lstlisting}
+\end{minipage}\par\smallskip
 
 Anschließend muss eine Wikipedia-ZIM-Datei lokal bereitgestellt werden. Der
 Pfad zu dieser Datei wird über den Eintrag \texttt{paths.zim\_file} in der
 jeweiligen Konfigurationsdatei festgelegt.
 
+\par\bigskip
+\noindent\begin{minipage}{\linewidth}
 \section{Lokales Setup (Entwicklung)}
 
 OpenSearch wird lokal über Docker Compose gestartet:
 
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \begin{lstlisting}[language=bash]
 docker compose up -d
 \end{lstlisting}
+\end{minipage}\par\smallskip
+\end{minipage}\par\smallskip
 
 Ob OpenSearch erreichbar ist, kann anschließend beispielsweise mit folgendem
 Aufruf geprüft werden:
 
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \begin{lstlisting}[language=bash]
 curl http://localhost:9200
 \end{lstlisting}
+\end{minipage}\par\smallskip
 
 Wenn die konfigurierte ZIM-Datei vorhanden und OpenSearch gestartet ist, kann
 die Indexierung im Entwicklungsmodus ausgeführt werden:
 
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \begin{lstlisting}[language=bash]
 WIKIPOD_ENV=dev python -m wikipod.cli index
 \end{lstlisting}
+\end{minipage}\par\smallskip
 
-Nach erfolgreicher Indexierung kann eine Anfrage an das System gestellt werden:
+\subsection{Sprachmodell einrichten}
 
+Die Konfigurationen \texttt{dev}, \texttt{report\_eval} und
+\texttt{pi-test} verwenden Ollama. Vor der ersten Antwortgenerierung muss
+Ollama gemäß der offiziellen Installationsanleitung eingerichtet werden
+(\url{https://docs.ollama.com/quickstart}). Falls der Dienst nicht bereits
+läuft, wird er in einem separaten Terminal gestartet:
+
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
+\begin{lstlisting}[language=bash]
+ollama serve
+\end{lstlisting}
+\end{minipage}\par\smallskip
+
+In einem weiteren Terminal wird das konfigurierte Modell heruntergeladen:
+
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
+\begin{lstlisting}[language=bash]
+ollama pull qwen2.5:1.5b
+\end{lstlisting}
+\end{minipage}\par\smallskip
+
+Der Modellname muss mit \texttt{llm.ollama\_model} übereinstimmen.
+Die Verbindung erfolgt über \texttt{llm.ollama\_host}, standardmäßig
+\texttt{http:/\allowbreak{}/\allowbreak{}localhost:11434}.
+
+Alternativ kann ein lokales GGUF-Modell direkt verwendet werden. Dazu wird
+die optionale Abhängigkeit installiert:
+
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
+\begin{lstlisting}[language=bash]
+pip install -e ".[dev,llm]"
+\end{lstlisting}
+\end{minipage}\par\smallskip
+
+In der gewählten Konfiguration wird \texttt{llm.backend} auf
+\texttt{llama\_cpp} gesetzt und \texttt{llm.model\_path} auf die separat
+bereitgestellte GGUF-Datei verwiesen. Dieser Backend-Typ wird auch von der
+Produktionskonfiguration verwendet; ein Ollama-Dienst ist dafür nicht erforderlich.
+
+\subsection{Anfragen ausführen}
+
+Nach erfolgreicher Indexierung und Einrichtung des Sprachmodells kann eine
+Anfrage an das System gestellt werden:
+
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \begin{lstlisting}[language=bash]
 WIKIPOD_ENV=dev python -m wikipod.cli query \
   "What is the Catholic Church?"
 \end{lstlisting}
+\end{minipage}\par\smallskip
 
+\par\smallskip
+\noindent\begin{minipage}{\linewidth}
 Soll ausschließlich das Retrieval untersucht werden, ohne eine Antwort durch
 das lokale Sprachmodell zu erzeugen, kann die Option
 \texttt{--chunks-only} verwendet werden:
 
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \begin{lstlisting}[language=bash]
 WIKIPOD_ENV=dev python -m wikipod.cli query \
   --chunks-only "What is the Catholic Church?"
 \end{lstlisting}
+\end{minipage}\par\smallskip
+\end{minipage}\par\smallskip
 
 \section{Konfiguration}
 
@@ -92,6 +177,34 @@ können unterschiedliche Datensätze und Laufzeitumgebungen verwendet werden,
 ohne die allgemeine Projektkonfiguration für jeden Versuch verändern zu
 müssen.
 
+Die Werte aus \texttt{config/\allowbreak{}default.\allowbreak{}yaml} werden mit denen der gewählten
+Umgebung zusammengeführt. Relative Dateipfade werden vom Projektverzeichnis
+aus aufgelöst. Für Indexierung und Retrieval müssen derselbe Index und
+dasselbe Embedding-Modell verwendet werden.
+
+Die Umgebung \texttt{report\_eval} verwendet den eigenen Index
+\texttt{wikipod-\allowbreak{}chunks-\allowbreak{}report-\allowbreak{}eval}; \texttt{dev} verwendet weiterhin
+\texttt{wikipod-chunks-dev}. Vor der ersten Evaluation muss der neue
+Evaluationsindex mit \texttt{WIKIPOD\_\allowbreak{}ENV=report\_\allowbreak{}eval} aufgebaut werden.
+Der bisher gemeinsam verwendete Entwicklungsindex bleibt dabei erhalten.
+
+\subsection{Bestehenden Index neu aufbauen}
+
+Die aktuellen Chunk-IDs enthalten die Abschnittsnummer. Indizes mit dem alten
+ID-Schema müssen einmal neu aufgebaut werden, damit zuvor überschriebene
+Chunks wieder enthalten sind. Auch beim Wechsel des Korpus oder des
+Embedding-Modells ist ein passender neuer Index erforderlich. Der folgende
+Befehl löscht den in der gewählten Umgebung konfigurierten Index und baut ihn
+anschließend neu auf:
+
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
+\begin{lstlisting}[language=bash]
+WIKIPOD_ENV=dev python -m wikipod.cli index --recreate-index
+\end{lstlisting}
+\end{minipage}\par\smallskip
+
 \section{Deployment auf dem Raspberry Pi}
 
 Für den Betrieb auf dem Raspberry Pi wird das Repository zunächst auf das
@@ -104,20 +217,84 @@ OpenSearch wird auch auf dem Raspberry Pi über Docker Compose betrieben.
 Nach dem Start von OpenSearch kann die Indexierung mit der für den jeweiligen
 Versuch vorgesehenen Konfiguration ausgeführt werden. Für Pi-spezifische
 Testläufe steht beispielsweise die Konfiguration
-\texttt{config/pi-test.yaml} zur Verfügung. Dadurch können Experimente auf dem
+\texttt{config/\allowbreak{}pi-\allowbreak{}test.\allowbreak{}yaml} zur Verfügung. Dadurch können Experimente auf dem
 Raspberry Pi durchgeführt werden, ohne die Standardkonfiguration für die
 Entwicklung zu verändern.
+
+\subsection{Vollständigen Index per Snapshot übertragen}
+
+Für den vollständigen Korpus wurde der Index auf dem Server erstellt und
+anschließend auf den Pi übertragen. Auf dem Pi \texttt{swl-rp01} ist das
+Dateisystem-Repository \texttt{wikipod\_repo} unter
+\path{/usr/share/opensearch/snapshots} registriert. Es enthält den Snapshot
+\texttt{snap\_1}, der am 2. September 2026 mit OpenSearch 2.17.0 erfolgreich
+erstellt wurde. Neben \texttt{wikipod-\allowbreak{}chunks-\allowbreak{}server} enthält dieser Snapshot
+Systemindizes und den globalen Clusterzustand
+(\texttt{include\_\allowbreak{}global\_\allowbreak{}state: true}).
+
+Der folgende Ablauf beschreibt eine erneute Wiederherstellung ausschließlich
+des Projektindex. Er wurde noch nicht praktisch geprüft und dokumentiert
+nicht die damaligen Kopier- und Restore-Befehle. Welche zusätzlichen
+Bestandteile beim ursprünglichen Restore übernommen wurden, ist nicht belegt.
+
+\begin{enumerate}
+    \item Für eine erneute Wiederherstellung eine separate OpenSearch-2.17.0-
+    Testinstanz verwenden. Die Compose-Datei bindet \texttt{./snapshots}
+    unter \path{/usr/share/opensearch/snapshots} ein und setzt
+    \texttt{path.repo}. Der OpenSearch-Prozess benötigt passende Dateirechte.
+    \item Das vollständige Snapshot-Repository in dieses Verzeichnis auf
+    dem Zielrechner kopieren. Quellrechner, Quellpfad und Übertragungsweg
+    müssen für den jeweiligen Aufbau festgelegt werden. Während der Kopie
+    darf das Quell-Repository nicht verändert werden.
+    \item Auf der Zielinstanz über \path{PUT /_snapshot/wikipod_repo} ein
+    Repository vom Typ \texttt{fs} mit dem Containerpfad als
+    \texttt{settings.location} und \texttt{settings.\allowbreak{}readonly: true}
+    registrieren. Über \path{GET /_snapshot/wikipod_repo/snap_1} prüfen,
+    dass der Snapshot verfügbar ist und den Zustand \texttt{SUCCESS} hat.
+    \item Über \path{POST /_snapshot/wikipod_repo/snap_1/_restore} den
+    Projektindex wiederherstellen. Im Request ausdrücklich
+    \texttt{indices: "wikipod-\allowbreak{}chunks-\allowbreak{}server"} und
+    \texttt{include\_\allowbreak{}global\_\allowbreak{}state: false} setzen. Damit werden für diesen
+    Ablauf die Systemindizes und der globale Zustand nicht übernommen.
+    Auf der Zielinstanz darf kein gleichnamiger offener Index vorhanden sein.
+    \item Den Abschluss über \path{GET /_cat/recovery?v} und den
+    wiederhergestellten Index über \path{GET /_cat/indices?v} kontrollieren.
+    Den vorhandenen produktiven Pi-Index für diese Prüfung nicht ersetzen.
+\end{enumerate}
+
+Die API-Details beschreibt die
+\href{https://docs.opensearch.org/2.17/tuning-your-cluster/availability-and-recovery/snapshots/snapshot-restore/}{OpenSearch-Dokumentation zu Snapshots}.
+In der WikiPod-Konfiguration auf dem Pi muss
+\texttt{opensearch.\allowbreak{}index\_\allowbreak{}name} anschließend auf den wiederhergestellten
+Index zeigen. \texttt{prod} verwendet aktuell
+\texttt{wikipod-\allowbreak{}chunks-\allowbreak{}server}. Danach zunächst eine Anfrage mit
+\texttt{--chunks-only} ausführen. Ein anschließender Aufruf von
+\texttt{index -\allowbreak{}-\allowbreak{}recreate-\allowbreak{}index} würde den wiederhergestellten Index löschen.
+
+\subsection{Offline-Betrieb vorbereiten}
+
+Python-Abhängigkeiten, Docker-Image, Embedding-Modell und Sprachmodell müssen
+vor dem Trennen der Internetverbindung auf dem Zielgerät verfügbar sein.
+Das Embedding-Modell wird sowohl bei der Indexierung als auch beim Retrieval
+benötigt. Nach der Vorbereitung werden Retrieval und Antwortgenerierung
+auf dem Pi ohne Internetverbindung geprüft.
+
+\subsection{Laufzeit überwachen}
 
 \par\smallskip
 \noindent\begin{minipage}[t]{\linewidth}
 Bei längeren Indexierungsläufen kann zusätzlich das im Projekt enthaltene
 Monitoring gestartet werden:
 
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \begin{lstlisting}[language=bash]
 python -m wikipod.scripts.monitor_run \
   --out logs/pi_top100_index.csv \
   --interval 10
 \end{lstlisting}
+\end{minipage}\par\smallskip
 \end{minipage}\par\smallskip
 
 Das Monitoring zeichnet unter anderem CPU-, Speicher-, Swap- und
@@ -125,10 +302,14 @@ Temperaturwerte sowie den Speicherverbrauch von WikiPod und OpenSearch auf.
 Nach Abschluss des Laufs kann das Monitoring mit \texttt{Ctrl+C} beendet und
 die erzeugte CSV-Datei ausgewertet werden:
 
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \begin{lstlisting}[language=bash]
 python -m wikipod.scripts.plot_metrics \
   logs/pi_top100_index.csv
 \end{lstlisting}
+\end{minipage}\par\smallskip
 
 \section{Evaluation ausführen}
 
@@ -137,36 +318,51 @@ Verfügung. Als Eingabe wird ein YAML- oder JSON-Datensatz mit
 natürlichsprachlichen Anfragen und den jeweils relevanten Wikipedia-Artikeln
 verwendet.
 
-Für die im Bericht eingesetzte Evaluationskonfiguration kann beispielsweise
+Vor der Evaluation muss der zur gewählten Konfiguration passende Index
+vorhanden sein. Die in \texttt{report\_eval} angegebene ZIM-Datei muss
+separat bereitgestellt werden. Für die Evaluationskonfiguration kann beispielsweise
 folgender Aufruf ausgeführt werden:
 
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \begin{lstlisting}[language=bash]
 WIKIPOD_ENV=report_eval python -m wikipod.cli evaluate \
   --dataset test/data/eval_queries.yaml
 \end{lstlisting}
+\end{minipage}\par\smallskip
 
 Die Anzahl der betrachteten Retrieval-Ergebnisse kann bei Bedarf mit
 \texttt{--top-k} überschrieben werden. Ergebnisse lassen sich außerdem als
 JSON oder CSV beziehungsweise gesammelt in einem Ausgabeverzeichnis speichern:
 
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \begin{lstlisting}[language=bash]
 WIKIPOD_ENV=report_eval python -m wikipod.cli evaluate \
   --dataset test/data/eval_queries.yaml \
   --top-k 5 \
   --output-dir logs/report_eval_k5
 \end{lstlisting}
+\end{minipage}\par\smallskip
 
-Optional können mit \texttt{--use-query-analyzer} die normalisierten Anfragen
+Optional können mit \texttt{-\allowbreak{}-\allowbreak{}use-\allowbreak{}query-\allowbreak{}analyzer} die normalisierten Anfragen
 des Query Analyzers verwendet und mit \texttt{--use-llm-judge} zusätzliche
 LLM-basierte Bewertungen aktiviert werden.
 
 Vor einem neuen Lauf können die automatisierten Tests und die statische
 Codeprüfung ausgeführt werden:
 
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \begin{lstlisting}[language=bash]
 pytest
 ruff check .
 \end{lstlisting}
+\end{minipage}\par\smallskip
 
 Diese Prüfungen werden zusätzlich bei Pushes und Pull Requests auf den
 \texttt{main}-Branch über GitHub Actions ausgeführt.
+\endgroup

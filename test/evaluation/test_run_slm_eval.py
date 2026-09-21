@@ -1,10 +1,11 @@
 from datetime import date
 from unittest.mock import MagicMock
 
+import pytest
 from click.testing import CliRunner
 from rich.console import Console
 
-from wikipod.evaluation.run_slm_eval import main
+from wikipod.evaluation.run_slm_eval import main, write_model_results
 
 
 class _FixedDate(date):
@@ -105,3 +106,28 @@ def test_main_prints_dated_path_in_console_output(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert "02.09.26" in result.output
+
+
+@pytest.mark.parametrize("content", ["", "[]", "# no queries\n", "null"])
+def test_empty_dataset_fails_before_pipeline_setup(tmp_path, monkeypatch, content):
+    dataset = tmp_path / "empty.yaml"
+    dataset.write_text(content)
+    output = tmp_path / "results"
+    setup = MagicMock(side_effect=AssertionError("Pipeline must not start"))
+    monkeypatch.setattr("wikipod.evaluation.run_slm_eval.get_config", setup)
+    result = CliRunner().invoke(main, [
+        "--dataset", str(dataset), "--models-dir", str(tmp_path),
+        "--output-dir", str(output),
+    ])
+    assert result.exit_code == 2
+    assert "--dataset" in result.output
+    assert "at least one query" in result.output
+    setup.assert_not_called()
+    assert not output.exists()
+
+
+def test_empty_results_do_not_create_output(tmp_path):
+    output = tmp_path / "results"
+    with pytest.raises(ValueError, match="without evaluated queries"):
+        write_model_results(output, "model.gguf", 5, [])
+    assert not output.exists()

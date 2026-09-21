@@ -1,3 +1,6 @@
+\par\addvspace{1em}
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
 \chapter{Dokumentenauswahl}
 \label{ch:dokumentenauswahl}
 
@@ -5,7 +8,7 @@ Da für die lokale Bereitstellung nur ein begrenztes Speicherbudget zur
 Verfügung steht, wird nur ein Teil der englischsprachigen Wikipedia
 ausgewählt, der dem zuvor konfigurierten Speicherbudget genügt. Dieses ist für den produktiven Indexierungslauf
 in \texttt{config/prod.yaml} unter
-\texttt{selection.storage\_budget\_mb} festgelegt
+\texttt{selection.\allowbreak{}storage\_\allowbreak{}budget\_\allowbreak{}mb} festgelegt
 (aktuell 13.000~MB), sodass der
 Scoring- beziehungsweise Selection-Algorithmus zum Einsatz kommt.
 
@@ -38,6 +41,8 @@ Zusätzlich zu den oben aufgeführten Metadaten aggregieren wir die Anzahl der A
 welche mithilfe von vorher normalisierten Titeln mit den eigentlichen Artikeln verknüpft werden können.
 
 Die einzelnen Metadaten können anhand einer Konfigurationsdatei verschieden gewichtet werden, um je nach Priorisierung unterschiedliche Ergebnisse im Scoring zu erzielen.
+
+\end{minipage}\par\addvspace{1em}
 
 \section{Link-Frequenz-Map und Zwei-Pass-Architektur}
 

@@ -68,6 +68,24 @@ Answer
 ```
 ## Setup
 
+### Prerequisites
+
+- Python 3.11 or newer (CI tests Python 3.11, 3.12, and 3.13).
+- Git and Docker with Docker Compose.
+- A local Wikipedia ZIM file and enough storage for the index and models.
+- For generated answers: Ollama or the optional `llama-cpp-python` backend.
+
+Run the commands below in a Unix shell from the repository root, with the virtual
+environment activated. Initial setup requires internet access to obtain packages,
+container images, the Wikipedia corpus, and model files.
+
+### Installation
+
+```bash
+git clone https://github.com/niklasbelieres/wikipod-rag.git
+cd wikipod-rag
+```
+
 Create a virtual environment and install the project with its development dependencies:
 
 ```bash
@@ -76,10 +94,25 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-WikiPod requires a local Wikipedia `.zim` file. ZIM files are not included in
-the repository and must be provided separately. Set `source.zim_file` in the
-appropriate configuration file under `config/` to the path of your local ZIM
-file.
+### Configure the corpus
+
+The full Wikipedia ZIM must be provided separately. The repository includes
+`test/data/climate-change-mini.zim` for automated tests; it is not the corpus used
+for the report evaluation.
+
+Configuration merges `config/default.yaml` with `config/<WIKIPOD_ENV>.yaml`.
+The default environment is `dev`. Add or update the following setting in
+`config/dev.yaml`, replacing the example with your actual file:
+
+```yaml
+paths:
+  zim_file: "/absolute/path/to/wikipedia.zim"
+```
+
+Relative paths are resolved against the repository root. Use the same environment,
+index name, and embedding model for indexing and subsequent queries.
+
+### Start OpenSearch
 
 Start OpenSearch with Docker Compose:
 
@@ -92,6 +125,12 @@ Verify that OpenSearch is running:
 ```bash
 curl http://localhost:9200
 ```
+
+The Compose setup uses OpenSearch 2.17.0, a 2 GB Java heap, and a persistent
+Docker volume. It disables authentication and TLS and is intended for local
+development. Wait for the HTTP check to succeed before indexing.
+
+### Build an index
 
 Runtime-specific configuration can be selected through `WIKIPOD_ENV`. Once the
 configured ZIM file is available and OpenSearch is running, indexing can be
@@ -117,6 +156,44 @@ select the environment whose index you intend to replace:
 WIKIPOD_ENV=dev python -m wikipod.cli index --recreate-index
 ```
 
+### Set up answer generation
+
+The `dev`, `report_eval`, and `pi-test` configurations select Ollama. Install it
+using the [official Ollama instructions](https://docs.ollama.com/quickstart).
+If it is not already running as an application or service, start it in a separate
+terminal and leave that terminal open:
+
+```bash
+ollama serve
+```
+
+Download the model named by `llm.ollama_model` in the configuration:
+
+```bash
+ollama pull qwen2.5:1.5b
+```
+
+WikiPod connects to `llm.ollama_host`, which defaults to
+`http://localhost:11434`. See the [Ollama CLI reference](https://docs.ollama.com/cli)
+for service and model commands.
+
+Alternatively, install the optional backend for a local GGUF model:
+
+```bash
+pip install -e ".[dev,llm]"
+```
+
+Provide a compatible GGUF file separately and set these values in your selected
+configuration file:
+
+```yaml
+llm:
+  backend: llama_cpp
+  model_path: "/absolute/path/to/model.gguf"
+```
+
+This backend loads the model directly and does not require an Ollama service.
+
 ### Querying
 
 After the index has been built, a query can be executed with:
@@ -131,7 +208,20 @@ To inspect only the retrieved chunks without running the local language model:
 WIKIPOD_ENV=dev python -m wikipod.cli query --chunks-only "What is the Catholic Church?"
 ```
 
-Configuration overrides for development, evaluation, Raspberry Pi tests, and production are stored in `config/`.
+### Prepare for offline use
+
+Before disconnecting the target machine, install the Python dependencies, obtain
+the Docker image and ZIM file, and download the chosen language model. Indexing
+and querying also load `embeddings.model_name` (by default
+`sentence-transformers/all-MiniLM-L6-v2`); ensure its model files are available
+locally by running the pipeline while connected or configuring a local model path.
+Use the same embedding model that produced the index.
+
+Verify both retrieval and answer generation on the target machine without internet
+access before relying on the offline setup. The report's full-corpus workflow
+builds the index on a server and transfers it to the Pi using OpenSearch snapshots;
+see report chapters 4 and 6. The Compose file provides a `./snapshots` mount for
+this purpose, but copying snapshot files alone does not restore an index.
 
 ## Testing
 
@@ -143,6 +233,9 @@ ruff check .
 ```
 
 The same checks are executed by GitHub Actions for pushes and pull requests to `main`.
+CI starts OpenSearch for the integration test. Locally, that test is skipped when
+OpenSearch is unavailable. Reader tests using a process pool require an environment
+that permits multiprocessing.
 
 ## Status
 
@@ -166,9 +259,50 @@ not a guarantee of the top-k distinct articles across the entire index. A shorte
 backend response ends the search but does not prove exhaustive coverage of an
 approximate nearest-neighbor index. Compared runs should use the same limit.
 
-WikiPod includes a retrieval evaluation workflow based on a fixed YAML dataset of natural-language queries and relevant Wikipedia article titles. The current evaluation reports metrics such as **Recall@k** and **reciprocal rank** so retrieval changes can be compared against a reproducible baseline.
+### Run retrieval evaluation
 
-For local evaluation, a small `wikipedia_en_100` ZIM can be used to build a fast test index. Pi-specific runs can use `config/pi-test.yaml` so the default development configuration does not need to be modified for each experiment.
+The dataset contains queries and relevant Wikipedia article titles. Reported
+metrics include Recall@k, Precision@k, nDCG@k, and mean reciprocal rank (MRR).
+
+Before evaluating, configure `paths.zim_file` in `config/report_eval.yaml` and
+build an index from the intended evaluation corpus. The configured
+`wikipedia_en_100_2026-08.zim` file must be supplied separately. `report_eval`
+uses its own index, `wikipod-chunks-report-eval`; development continues to use
+`wikipod-chunks-dev`. Build the new evaluation index once before running the
+commands below. The previously shared development index is not renamed or deleted.
+Existing indices containing a different corpus must be recreated deliberately.
+
+```bash
+WIKIPOD_ENV=report_eval python -m wikipod.cli index
+WIKIPOD_ENV=report_eval python -m wikipod.cli evaluate \
+  --dataset test/data/eval_queries.yaml \
+  --top-k 5 \
+  --output-dir logs/report_eval_k5
+```
+
+The output directory contains `results.json` and `results.csv`. Optional flags:
+
+- `--use-query-analyzer`: normalize queries before retrieval.
+- `--use-llm-judge`: add model-based relevance judgments; requires the configured
+  language-model backend to be ready. Basic retrieval evaluation does not need it.
+
+### Compare local language models
+
+Install `.[dev,llm]`, place compatible `.gguf` files in `models/`, and use a
+non-empty evaluation dataset. This command uses `llama_cpp` for each model,
+regardless of the backend selected for normal queries:
+
+```bash
+WIKIPOD_ENV=report_eval python -m wikipod.cli evaluate-models \
+  --dataset test/data/eval_queries.yaml \
+  --models-dir models \
+  --top-k 5 \
+  --output-dir logs/model_comparison
+```
+
+Answers and latencies are saved beneath
+`<output-dir>/<DD.MM.YY>/<model_stem>/`. Use a separate output directory for each
+comparison to avoid overwriting earlier runs on the same day.
 
 ## Monitoring
 

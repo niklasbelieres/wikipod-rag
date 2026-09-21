@@ -19,21 +19,21 @@ auf nur vier Worker-Bereiche. Dies führte bei rund 7 Millionen Artikeln dazu, d
 Speicher hielt, bevor er sie am Ende zurückgab. Eine erste Maßnahme, kleinere Batches von 5.000 Artikeln zu nutzen, verringerte den
 Speicherbedarf pro Worker, löste das Problem allerdings nur teilweise, da der nächste Lauf nach elf Stunden erneut mit vollem Swap endete.
 
-Durch den zweiten Lauf ist uns die eigentliche Ursache, dass \texttt{extract\_metadata()} für jeden Artikel den vollständigen Abschnittstext
+Durch den zweiten Lauf ist uns die eigentliche Ursache, dass \texttt{extract\_\allowbreak{}metadata()} für jeden Artikel den vollständigen Abschnittstext
 aufbaut, bewusst geworden. Bei einem geschätzten Speicherbedarf von 3--5~KB Text pro Artikel sind das hochgerechnet 25--35~GB für den Artikeltext,
 was die Speicherkapazität von 16~GB auf dem Raspberry Pi deutlich überschreitet. Für die reine Selektion der Artikel wird der Volltext allerdings
 nicht benötigt, da diese nur von Metadaten wie beispielsweise \texttt{link\_count} oder \texttt{word\_count} abhängt. Daher sind wir zu dem
 Entschluss gekommen, diesen Teil der Pipeline in zwei Abschnitte aufzuteilen: Der erste Durchgang über den ganzen
-Korpus läuft mit \texttt{include\_sections=False} und verwirft den Volltext sofort wieder, der zweite Durchgang lädt ihn gezielt nur
+Korpus läuft mit \texttt{include\_\allowbreak{}sections=False} und verwirft den Volltext sofort wieder, der zweite Durchgang lädt ihn gezielt nur
 für die am Ende ausgewählte, deutlich kleinere Teilmenge nach.
 
 Auch nach diesem Fix bestand das Speicherproblem weiter: Ein dritter Lauf endete erneut mit vollem Swap, diesmal mit einem noch höheren Speicherbedarf
 als beim reinen Batch-Fix, obwohl der Volltext zu diesem Zeitpunkt bereits nicht mehr gehalten wurde. Ursache waren die Link-Listen selbst: Der
 \texttt{importance}-Score in \texttt{score\_article()} benötigt für jeden Artikel die Rohliste seiner ausgehenden Links, nicht nur die aggregierte
-\texttt{link\_frequency\_map}. Bei geschätzt 20--75 Links pro Artikel und dem Speicher-Overhead einzelner Python-Strings ergaben sich dadurch zusätzlich 8--30~GB allein für
+\texttt{link\_\allowbreak{}frequency\_\allowbreak{}map}. Bei geschätzt 20--75 Links pro Artikel und dem Speicher-Overhead einzelner Python-Strings ergaben sich dadurch zusätzlich 8--30~GB allein für
 Linklisten. Ein erster Lösungsversuch über String-Interning reduzierte Duplikate zwar innerhalb eines einzelnen Worker-Prozesses, ging aber beim Rücktransport der
 Ergebnisse in den Hauptprozess (Pickle-Serialisierung) wieder verloren, da jeder Prozess seine eigene Intern-Tabelle führt. Die eigentliche Ursache lag jedoch tiefer:
-\texttt{select\_within\_budget()} hielt weiterhin sämtliche Artikel-Objekte des gesamten Korpus gleichzeitig in einer Liste, um sie zu sortieren. Erst der
+\texttt{select\_\allowbreak{}within\_\allowbreak{}budget()} hielt weiterhin sämtliche Artikel-Objekte des gesamten Korpus gleichzeitig in einer Liste, um sie zu sortieren. Erst der
 Umbau auf eine Zwei-Pass-Streaming-Architektur mit einem JSONL-Cache auf der Festplatte behob das Problem strukturell: Der erste Durchgang baut die Link-Frequency-Map
 auf und schreibt dabei jeden Artikel als JSONL-Zeile mit. Der zweite Durchgang liest von dort zurück und verwirft nach dem Scoring jedes Artikels dessen Links unmittelbar wieder.
 Dadurch befindet sich im Hauptprozess zu keinem Zeitpunkt mehr als ein Artikel mit vollständigen Links gleichzeitig im Speicher.
