@@ -9,18 +9,16 @@ Verfügung steht, wird nur ein Teil der englischsprachigen Wikipedia
 ausgewählt, der dem zuvor konfigurierten Speicherbudget genügt. Dieses ist für den produktiven Indexierungslauf
 in \texttt{config/prod.yaml} unter
 \texttt{selection.\allowbreak{}storage\_\allowbreak{}budget\_\allowbreak{}mb} festgelegt
-(aktuell 13.000~MB), sodass der
-Scoring- beziehungsweise Selection-Algorithmus zum Einsatz kommt.
+(aktuell 13.000~MB), sodass der Scoring- und Selection-Algorithmus zum Einsatz kommt.
 
 \section{Metadatenextraktion}
 
 Um aus den Wikipedia-Artikeln, welche in Form von HTML-Dokumenten innerhalb
 einer ZIM-Datei vorliegen, Metadaten extrahieren zu können, müssen diese
-Dokumente zunächst vorverarbeitet beziehungsweise normalisiert und bereinigt
+Dokumente zunächst normalisiert und bereinigt
 werden.
 
-Hierzu existiert innerhalb der Pipeline das Modul \texttt{Analysis}, welches
-genau diese Aufgabe übernimmt. Resultierend werden artikelweise folgende
+Hierzu existiert innerhalb der Pipeline das Modul \texttt{analysis}. Resultierend werden artikelweise folgende
 Metadaten extrahiert:
 
 \begin{itemize}
@@ -44,69 +42,69 @@ Die einzelnen Metadaten können anhand einer Konfigurationsdatei verschieden gew
 
 \end{minipage}\par\addvspace{1em}
 
-\section{Link-Frequenz-Map und Zwei-Pass-Architektur}
+\section{Link-Frequency-Map und Zwei-Pass-Architektur}
+\label{sec:link-frequenz-map}
 
 Für die Berechnung der beiden strukturellen Scoring-Signale
 \texttt{importance} und \texttt{incoming\_links} wird eine korpusweite
-Link-Frequenz-Map erzeugt. Sie ordnet jedem Linkziel die Anzahl der Vorkommen
+Link-Frequency-Map erzeugt. Sie ordnet jedem Linkziel die Anzahl der Vorkommen
 als Ziel eines ausgehenden Links im gesamten Korpus zu. Damit kann einerseits
 für einen Artikel bestimmt werden, wie häufig er von anderen Artikeln
 referenziert wird (\texttt{incoming\_links}). Andererseits wird für
 \texttt{importance} für jedes ausgehende Linkziel dessen korpusweite
 Häufigkeit herangezogen.
 
-Da diese Link-Frequenzen erst bekannt sind, nachdem die ausgehenden Links aller
+Da diese Linkhäufigkeiten erst bekannt sind, nachdem die ausgehenden Links aller
 Artikel berücksichtigt wurden, erfolgt die Verarbeitung in zwei Durchläufen.
 Im ersten Durchlauf werden die Artikel analysiert und aus ihren ausgehenden
-Links die vollständigen korpusweiten Link-Frequenzen aufgebaut. Erst danach
+Links die vollständigen korpusweiten Link-Häufigkeiten aufgebaut. Erst danach
 kann im zweiten Durchlauf für jeden Artikel der Score berechnet werden, da
 sowohl \texttt{importance} als auch \texttt{incoming\_links} auf dieser
-globalen Link-Frequenz-Map basieren. Die eigentliche budgetbeschränkte Auswahl
-erfolgt somit erst, nachdem die für das Scoring benötigten korpusweiten
-Informationen vollständig vorliegen.
+globalen Häufigkeitstabelle basieren. Die eigentliche budgetbeschränkte Auswahl
+erfolgt somit erst, nachdem die für das Scoring benötigten Informationen vollständig vorliegen.
 
 
 \section{Scoring-Modell}
 Um Artikel innerhalb des Speicherbudgets priorisieren zu können, wird jedem Artikel ein einzelner,
-kombinierter Score zugewiesen. Dieser Score setzt sich aus fünf Metriken zusammen, die jeweils einen anderen
+kombinierter Score zugewiesen. Dieser Score setzt sich aus fünf Signalen zusammen, die jeweils einen anderen
 Aspekt der Relevanz eines Artikels abbilden: der Umfang des Inhalts (\texttt{word\_count}), die ausgehende
 Vernetzung (\texttt{link\_count}), eine Näherung an die korpusweite Wichtigkeit über die Häufigkeit,
 mit der die verlinkten Zielartikel selbst referenziert werden (\texttt{importance}), die eingehende Popularität
 innerhalb des Korpus (\texttt{incoming\_links}) sowie externe Aufrufzahlen (\texttt{pageviews}).
 
-Da diese Signale unterschiedliche Wertebereiche und Verteilungen aufweisen, insbesondere \texttt{importance} als 
-Summe über alle ausgehenden Links kann bei stark vernetzten Artikeln deutlich größere Werte annehmen als die übrigen Signale,
-wird jedes Signal vor der Gewichtung logarithmisch gedämpft ($\log(1+x)$). Dadurch wird verhindert, dass einzelne Ausreißerwerte,
-etwa ein extrem häufig verlinkter Hub-Artikel, den Gesamtscore dominieren. Für vier der fünf Signale
-(\texttt{word\_count}, \texttt{link\_count}, \texttt{incoming\_links}, \texttt{pageviews}) ist dies je ein
-einzelner, gedämpfter Skalarwert; \texttt{importance} bildet dabei eine Ausnahme (siehe unten). Der Score eines
-Artikels $a$ berechnet sich insgesamt als gewichtete Summe:
+Da diese Signale unterschiedliche Wertebereiche und Verteilungen aufweisen, wird jedes Signal vor der
+Gewichtung logarithmisch gedämpft ($\log(1+x)$). Das verhindert, dass einzelne Ausreißerwerte, etwa ein
+extrem häufig verlinkter Hub-Artikel, den Gesamtscore dominieren. Für \texttt{word\_count}, \texttt{link\_count},
+\texttt{incoming\_links} und \texttt{pageviews} ist der Beitrag zum Score damit denkbar einfach: ein einzelner
+gedämpfter Wert, multipliziert mit dem jeweiligen Gewicht $w_s$:
 
 \[
-\mathrm{Score}(a)
-= \sum_{s \,\in\, S \setminus \{\mathrm{importance}\}} w_s \cdot
-\log\left(1 + \mathrm{value}_s(a)\right)
-\;+\; w_{\mathrm{importance}} \cdot \sum_{l \,\in\, \mathrm{links}(a)} \log\bigl(1 + \mathrm{freq}(l)\bigr)
+\mathrm{contrib}_s(a) = w_s \cdot \log\left(1 + \mathrm{value}_s(a)\right)
 \]
 
-Wobei $S$ die fünf Signale, $w_s$ die zugehörigen, konfigurierbaren Gewichte, $\mathrm{links}(a)$ die Liste der
-ausgehenden Links von $a$ und $\mathrm{freq}(l)$ die korpusweite Häufigkeit des Linkziels $l$ aus der weiter
-unten beschriebenen Link-Häufigkeitsmap bezeichnet. \texttt{importance} nimmt damit strukturell eine
-Sonderstellung ein: Während die übrigen vier Signale je ein einzelner gedämpfter Skalarwert sind, ist
-\texttt{importance} eine Summe gedämpfter Terme über eine pro Artikel unterschiedliche Anzahl an Links --
-äquivalent zu $\log\!\left(\prod_{l \in \mathrm{links}(a)} (1+\mathrm{freq}(l))\right)$. Die logarithmische
-Dämpfung wirkt hier also pro Linkziel, nicht auf den resultierenden Artikelwert als Ganzes.
+\texttt{importance} funktioniert anders und braucht deshalb eine eigene Betrachtung. Statt eines einzelnen
+Werts pro Artikel wird hier für \emph{jeden} ausgehenden Link einzeln gedämpft, wie oft dessen Ziel im
+gesamten Korpus referenziert wird, und diese Werte werden anschließend aufsummiert. Ein Artikel mit vielen
+ausgehenden Links liefert damit automatisch einen größeren Rohwert als ein Artikel mit wenigen Links, ganz
+unabhängig vom zugewiesenen Gewicht, wodurch die Dämpfung pro Linkziel wirkt. Formal:
 
-Für die Berechnung von \texttt{importance} und \texttt{incoming\_links} wird vorab eine korpusweite
-Link-Häufigkeitsmap benötigt, die zählt, wie oft jeder Artikeltitel als Ziel eines Links vorkommt. Diese
-kann erst vollständig vorliegen, nachdem der gesamte Korpus einmal durchlaufen wurde. Das Scoring erfordert
-somit zwangsläufig zwei Durchläufe, bevor die eigentliche Auswahl beginnen kann.
-Die Gewichte $w_s$ sind nicht fest codiert, sondern über
-\texttt{config/prod.yaml} konfigurierbar (Tabelle~\ref{tab:scoring-weights}).
-Somit ist die Priorisierung eine dokumentierte Design-Entscheidung.
+\[
+\mathrm{contrib}_{\mathrm{importance}}(a) = w_{\mathrm{importance}} \cdot \sum_{l \,\in\, \mathrm{links}(a)} \log\bigl(1 + \mathrm{freq}(l)\bigr)
+\]
+
+wobei $\mathrm{links}(a)$ die ausgehenden Links von Artikel $a$ und $\mathrm{freq}(l)$ die korpusweite
+Häufigkeit des Linkziels $l$ aus der in Abschnitt~\ref{sec:link-frequenz-map} beschriebenen
+Link-Häufigkeitstabelle bezeichnet. Der Gesamtscore eines Artikels ist schließlich die Summe aller fünf
+Beiträge:
+
+\[
+\mathrm{Score}(a) = \sum_{s \,\in\, \{\mathrm{word\_count},\, \mathrm{link\_count},\, \mathrm{incoming\_links},\, \mathrm{pageviews}\}} \mathrm{contrib}_s(a) \;+\; \mathrm{contrib}_{\mathrm{importance}}(a)
+\]
+
+Die Gewichte $w_s$ sind nicht fest codiert, sondern über \texttt{config/prod.yaml} konfigurierbar.
 
 Tabelle~\ref{tab:scoring-weights} zeigt die konfigurierten Gewichte zusammen mit den tatsächlich gemessenen
-Signalwerten über den vollen en.wikipedia-Korpus (7.322.195 Artikel). Für jedes Signal ist der Mittelwert des
+Signalwerten über den vollen en.wikipedia-Datensatz (7.322.195 Artikel). Für jedes Signal ist der Mittelwert des
 gedämpften Rohwerts ($\log(1+x)$), der daraus resultierende gewichtete Mittelwert sowie dessen Anteil am
 mittleren Gesamtscore aufgeführt.
 
@@ -130,18 +128,13 @@ mittleren Gesamtscore aufgeführt.
 \end{table}
 
 Auffällig ist, dass \texttt{importance} trotz eines mit 0,150 vergleichsweise niedrigen Gewichts mit 82,61\,\%
-den Score dominiert, während \texttt{incoming\_links} trotz des höchsten Gewichts (0,250) nur 0,31\,\% beiträgt.
-Ursache dafür ist die oben beschriebene strukturelle Sonderstellung von \texttt{importance}: Da die Dämpfung
-pro Linkziel und nicht auf den aggregierten Artikelwert wirkt, wächst \texttt{importance} tendenziell mit der
-Anzahl der ausgehenden Links eines Artikels -- ein Artikel mit vielen (auch nur mäßig populären) ausgehenden
-Links summiert entsprechend viele bereits gedämpfte Terme und erreicht dadurch einen deutlich größeren
-Rohwert als etwa \texttt{link\_count} desselben Artikels, das dieselbe Linkanzahl nur einmal dämpft. Die
-Rohwerte bleiben dadurch auch nach der Dämpfung stark rechtsschief (95.\,Perzentil 89,912, Maximum 51.226,971
-gegenüber einem Mittelwert von 36,647), während die übrigen Signale in einer deutlich engeren Größenordnung
-liegen. Die konfigurierten Gewichte spiegeln also nicht unmittelbar den tatsächlichen Einfluss der einzelnen
-Signale auf die resultierende Auswahl wider. Diese Diskrepanz zwischen beabsichtigter Gewichtung und
-tatsächlichem Verhalten wird in Kapitel~\ref{ch:diskussion} als mögliche Verbesserung für eine zukünftige
-Iteration der Scoring-Funktion aufgegriffen.
+den Score dominiert, während \texttt{incoming\_links} trotz des höchsten Gewichts (0,250) nur 0,31\,\%
+beiträgt. Das liegt an der oben beschriebenen Summenbildung: Artikel mit vielen ausgehenden Links erreichen
+dadurch einen deutlich größeren Rohwert, unabhängig vom zugewiesenen Gewicht, während die übrigen Signale in
+einer deutlich engeren Größenordnung liegen. Die konfigurierten Gewichte spiegeln damit nicht unmittelbar den tatsächlichen Einfluss
+der einzelnen Signale auf die resultierende Auswahl wider, was in
+Kapitel~\ref{ch:diskussion} als mögliche Verbesserung für eine zukünftige Iteration der Scoring-Funktion
+aufgegriffen wird.
 
 
 
@@ -152,8 +145,8 @@ Scoring-Funktion berechneten 'Wert' und ein 'Gewicht' (Byte-Größe \texttt{html
 Auswahl einer Teilmenge, sodass der Gesamtwert maximiert wird, ohne aber das Gewichtslimit (hier Speicherbudget)
 zu überschreiten.
 
-Das 0/1-Knapsack-Problem ist in einer exakten Form NP-hart, was für uns bedeutet, dass eine optimale Lösung bei einem
-Korpus dieser Größenordnung nicht praktikabel berechenbar ist. Allerdings ist eine Approximation durch
+Das 0/1-Knapsack-Problem ist in einer exakten Form NP-hart, was hier bedeutet, dass eine optimale Lösung bei einer Dokumentenbasis
+dieser Größenordnung nicht praktikabel berechenbar ist. Allerdings ist eine Approximation durch
 Nutzung der Greedy-Heuristik möglich. Hierbei wird für jeden Artikel das Verhältnis von Score zu 
 Byte-Größe ('Score pro Byte') berechnet, die Artikel werden absteigend danach sortiert und in dieser Reihenfolge
 ausgewählt, bis das Budget ausgeschöpft ist. Diese Heuristik liefert zwar keine nachweislich optimale
@@ -161,8 +154,10 @@ Lösung, ist aber als Standardansatz für Knapsack-Instanzen dieser Größe etab
 effizient berechenbar.
 
 Das Ergebnis der Auswahl umfasst neben der eigentlichen Artikelmenge auch Kennzahlen zur Budgetausschöpfung
-(\texttt{used\_mb}, \texttt{utilization}). In einem zuvor durchgeführten Selektionslauf auf dem vollen
+(\texttt{used\_mb}, \texttt{utilization}). 
+
+In einem zuvor durchgeführten Selektionslauf auf dem vollen
 en.wikipedia-Korpus mit einem Speicherbudget von 13.000~MB wurden von 7.322.195 Kandidatenartikeln
 1.638.375 Artikel (22,4\,\%) ausgewählt. Dabei wurden 13.000,0 von 13.000~MB Speicherbudget genutzt,
 was einer Budgetausschöpfung (\texttt{utilization}) von 100\,\% entspricht. Die Greedy-Heuristik füllte
-das für diesen Lauf konfigurierte Budget damit praktisch vollständig aus.
+das für diesen Lauf konfigurierte Budget damit vollständig aus.

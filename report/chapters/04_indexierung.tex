@@ -5,11 +5,9 @@
 \label{ch:indexierung}
 
 Damit die im vorherigen Pipeline-Schritt ausgewählte Wikipedia-Teilmenge von einem Large-Language-Modell genutzt
-werden kann, müssen diese Artikel zunächst in geeignete Textabschnitte (Chunks) unterteilt werden, bevor diese
-als dichte Vektoren indexiert werden können. Die Aufteilung ermöglicht eine granularere Suche nach relevanten
-Informationen, da bei einer Anfrage nicht zwangsläufig ein vollständiger Wikipedia-Artikel, sondern gezielt
-relevante Textpassagen als Kontext für das Large-Language-Modell abgerufen werden können. Die Verwendung von
-Textpassagen als Retrieval-Einheiten stellt dabei einen etablierten Ansatz im Dense Retrieval dar~\cite{karpukhin-etal-2020-dense}.
+werden kann, müssen die Artikel zunächst in geeignete Textabschnitte (Chunks) unterteilt und als dichte Vektoren
+indexiert werden. Diese Aufteilung ermöglicht bei einer Anfrage den gezielten Abruf relevanter Textpassagen statt
+ganzer Artikel als Kontext für das Sprachmodell -- ein im Dense Retrieval etablierter Ansatz~\cite{karpukhin-etal-2020-dense}.
 
 \section{Chunking-Strategie}
 \label{sec:chunking-strategie}
@@ -20,16 +18,15 @@ Abschnitte einzeln. Dadurch wird
 sichergestellt, dass ein Chunk ausschließlich Text aus einem einzelnen Wikipedia-Abschnitt enthält und
 der inhaltliche Zusammenhang der jeweiligen Passage erhalten bleibt.
 
-Innerhalb eines Abschnitts werden die Texte mit einer maximalen Fenstergröße von 250 Wörtern und einer
-Überlappung von 40 Wörtern unterteilt. Die Wahl der Chunk-Größe stellt einen Kompromiss zwischen der
-Granularität des Retrievals und dem Erhalt ausreichenden Kontextes dar. Untersuchungen zeigen, dass die
-optimale Chunk-Größe von der Charakteristik der Daten, der konkreten Retrieval-Aufgabe und dem verwendeten
-Embedding-Modell abhängt und daher nicht allgemein festgelegt werden kann~\cite{bhat2025rethinkingchunksizelongdocument}. Die für dieses Projekt verwendete Fenstergröße wurde
-daher als geeigneter Kompromiss für den verwendeten Wikipedia-Korpus und das nachfolgende Retrieval
-festgelegt.
+Innerhalb eines Abschnitts werden die Texte mit einer maximalen Größe von 250 Wörtern und einer
+Überlappung von 40 Wörtern unterteilt. Die Chunk-Größe ist dabei ein Kompromiss zwischen der Granularität
+des Retrievals und ausreichendem Kontext pro Chunk, da die optimale Größe laut Literatur von der
+Charakteristik der Daten, der konkreten Retrieval-Aufgabe und dem verwendeten Embedding-Modell abhängt und
+sich nicht allgemein festlegen lässt~\cite{bhat2025rethinkingchunksizelongdocument}, wurde sie für diesen
+Wikipedia-Korpus und das nachfolgende Retrieval pragmatisch festgelegt. Die Überlappung verhindert
+zusätzlich, dass zusammengehörige Informationen exakt an einer Chunk-Grenze auseinandergerissen werden.
 
-Die Überlappung soll verhindern, dass zusammengehörige Informationen durch eine Chunk-Grenze vollständig
-voneinander getrennt werden. Zusätzlich enthält jeder Chunk Metadaten, insbesondere den Titel des
+Zusätzlich enthält jeder Chunk Metadaten, insbesondere den Titel des
 zugehörigen Wikipedia-Abschnitts. Diese werden im weiteren Verlauf der Pipeline verwendet, um die Herkunft
 der abgerufenen Textpassagen im Prompt kenntlich zu machen und eine Quellenattribution zu ermöglichen.
 
@@ -55,33 +52,12 @@ Das Modell wurde auf über 1,17~Milliarden Satzpaaren aus unterschiedlichen Quel
 anderem für Information-Retrieval-, Clustering- und Sentence-Similarity-Aufgaben vorgesehen~\cite{minilm-model-card}. Damit ist es für den im Projekt verfolgten Anwendungsfall des semantischen
 Retrievals geeignet.
 
-Eine weitere relevante Einschränkung des Modells ist die maximale Eingabelänge von 256 Word Pieces~\cite{minilm-model-card}. Da die Chunk-Größe anhand von Wörtern festgelegt wird, kann daraus jedoch nicht
-direkt abgeleitet werden, dass jeder Chunk diese Grenze unterschreitet, da ein Wort in mehrere Word Pieces
-zerlegt werden kann. Die tatsächliche Eingabelänge wird daher durch das verwendete Tokenisierungsverfahren
-begrenzt.
-
 Für die Indexierung und die spätere Abfrage wird dasselbe Embedding-Modell mit identischen Einstellungen
 verwendet. Sowohl \texttt{embed\_chunks()} als auch \texttt{embed\_query()} greifen auf dieselbe
 \texttt{Embedder}-Instanz mit aktivierter L2-Normalisierung
-(\texttt{normalize\_\allowbreak{}embeddings=True}) zurück. Dadurch werden Query- und Chunk-Vektoren im selben Vektorraum
-repräsentiert. Bei L2-normalisierten Vektoren entspricht das Skalarprodukt der Kosinus-Ähnlichkeit, wodurch
-die Berechnung direkt mit dem im OpenSearch-Index verwendeten \texttt{cosinesimil}-Ähnlichkeitsmaß
-übereinstimmt (Abschnitt~\ref{sec:opensearch-index-design}).
-
-Zur Einschätzung des Rechenaufwands wurde die Embedding-Geschwindigkeit isoliert gemessen -- also ohne
-den Anteil von OpenSearch-Bulk-Writes oder ZIM-Zugriff, um ausschließlich die Kosten der Modellinferenz
-abzubilden. Unterschieden wurden zwei Fälle: der Massen-Durchsatz beim Indexieren (Batch-Embedding mit
-\texttt{embed\_chunks()}, Chunks von ca.\ 250 Wörtern Länge entsprechend der in
-Abschnitt~\ref{sec:chunking-strategie} festgelegten Fenstergröße) sowie die Latenz einer einzelnen
-Anfrage (\texttt{embed\_query()}, Batch-Größe 1, wie im Retrieval-Pfad zur Laufzeit).
-
-Die Messung erfolgte auf dem für die Indexierung des vollen Korpus verwendeten Build-Server (104~Kerne),
-nicht auf dem Raspberry Pi selbst -- die Zahlen belegen daher die grundsätzliche Eignung des Modells,
-nicht die konkrete Laufzeit auf der Zielhardware. Beim Batch-Embedding wurden 655,0~Chunks pro Sekunde
-erreicht, bei einzelnen Anfragen betrug die mittlere Latenz 5,4~ms pro Query. Insbesondere die
-Query-Latenz liegt damit deutlich unterhalb der in Kapitel~\ref{ch:evaluation} gemessenen
-Gesamt-Retrieval-Latenz, sodass das Embedding selbst auf dieser Hardware keinen dominanten Anteil an der
-Anfragebearbeitung ausmacht. Eine entsprechende Messung direkt auf dem Raspberry Pi steht noch aus.
+(\texttt{normalize\_\allowbreak{}embeddings=True}) zurück, sodass Query- und Chunk-Vektoren im selben
+Vektorraum liegen. Diese Normalisierung dient der Abstimmung auf das im OpenSearch-Index verwendete 
+\texttt{cosinesimil}-Ähnlichkeitsmaß (Abschnitt~\ref{sec:opensearch-index-design}).
 
 
 \section{OpenSearch-Index-Design}
@@ -115,19 +91,6 @@ kleinen Testkorpus auf dem eigenen Rechner ausreichend. Der eigentliche Indexier
 dem Pi statt, sondern auf einem für diesen Zweck bereitgestellten leistungsstärkeren Server, wodurch Speicherknappheit als limitierender Faktor
 eliminiert wurde. Der fertige Index wurde anschließend per OpenSearch-Snapshot vom Server auf den Pi übertragen (\texttt{path.repo}-Mechanismus), 
 statt den aufwendigen Indexierungsvorgang selbst auf der eingeschränkten Zielhardware laufen zu lassen.
-
-\section{Skalierung auf den vollen Korpus}
-Dieser Abschnitt betrifft nicht mehr den vollen, ungefilterten Wikipedia-Korpus, sondern die bereits durch die Selection (Kapitel~\ref{ch:dokumentenauswahl}) 
-auf das konfigurierte Speicherbudget reduzierte Teilmenge. Die aufwendige Zwei-Pass-Streaming-Architektur, die dort nötig war, greift hier nicht mehr, denn 
-Chunking, Embedding und Indexierung laufen über eine von vornherein kleinere, budgetbeschränkte Artikelmenge.
-
-Im \texttt{index}-Kommando der CLI wird die Chunk-Liste für diese gesamte ausgewählte Teilmenge auf einmal aufgebaut, statt gestreamt zu werden. Erst 
-Embedding und Indexierung selbst laufen anschließend batchweise (in Schritten von \texttt{config.\allowbreak{}embeddings.\allowbreak{}batch\_\allowbreak{}size}, standardmäßig 32): Pro
-Durchlauf werden nur die Vektoren eines Batches berechnet und indexiert, nie die aller Chunks gleichzeitig.
-
-Dass die vollständig im Speicher gehaltene Chunk-Liste hier kein Problem darstellte, hat vor allem zwei Gründe: erstens ist die Teilmenge 
-durch das Speicherbudget von Haus aus begrenzt, zweitens lief der eigentliche Indexierungslauf nicht auf dem Pi, sondern auf einem dafür 
-bereitgestellten leistungsstärkeren Server.
 
 \section{Retrieval}
 Die Klasse \texttt{Retriever} ermöglicht es, Query-Embedding und $k$-NN-Suche zu abstrahieren. Die zentrale Methode

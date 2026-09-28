@@ -38,59 +38,41 @@ praktikabel durchführen lässt.
 \section{Ziele der Projektarbeit}
 
 Ausgehend von dieser Problemstellung verfolgt die Projektarbeit fünf zentrale
-Ziele. Zunächst soll eine lokale Kopie ausgewählter Inhalte der
-englischsprachigen Wikipedia bereitgestellt werden. Da die verfügbare
-Speicherkapazität begrenzt ist, soll hierfür ein Verfahren entwickelt werden,
-das eine geeignete Teilmenge der Wikipedia unter Einhaltung eines vorgegebenen
-Speicherbudgets auswählt.
-
-Die ausgewählten Inhalte sollen anschließend als dichte Vektoren in OpenSearch
-indexiert werden, sodass zu einer natürlichsprachlichen Anfrage relevante
-Textpassagen semantisch abgerufen werden können. Auf dieser Grundlage soll ein
-für die eingeschränkte Zielhardware geeignetes Sprachmodell ausgewählt und mit
-den abgerufenen Textpassagen zur lokalen Antwortgenerierung eingesetzt werden.
-
-Abschließend soll die entwickelte Lösung sowohl hinsichtlich ihrer Effektivität
-als auch ihrer Effizienz evaluiert werden. Dabei werden insbesondere die
-Qualität des Retrievals sowie Laufzeit und Ressourcenbedarf auf der
-vorgesehenen Hardware betrachtet. Die Projektarbeit untersucht damit die
-folgenden fünf Schwerpunkte:
+Ziele:
 
 \begin{enumerate}
 \setlength{\itemsep}{0pt}
 \setlength{\parsep}{0pt}
-    \item Bereitstellung einer lokalen Kopie der englischsprachigen Wikipedia,
-    \item Auswahl einer Teilmenge unter Berücksichtigung eines Speicherbudgets,
-    \item Indexierung der ausgewählten Inhalte als dichte Vektoren mit OpenSearch,
-    \item Auswahl und Einsatz eines für die Zielhardware geeigneten Sprachmodells,
-    \item Evaluation der Gesamtlösung hinsichtlich Effektivität und Effizienz.
+    \item Bereitstellung einer lokalen Kopie ausgewählter Inhalte der
+    englischsprachigen Wikipedia,
+    \item Auswahl einer geeigneten Teilmenge unter Einhaltung eines
+    vorgegebenen Speicherbudgets,
+    \item Indexierung der ausgewählten Inhalte als dichte Vektoren mit
+    OpenSearch für den semantischen Abruf relevanter Textpassagen,
+    \item Auswahl und Einsatz eines für die Zielhardware geeigneten
+    Sprachmodells zur lokalen Antwortgenerierung,
+    \item Evaluation der Gesamtlösung hinsichtlich Effektivität
+    (Retrieval-Qualität) und Effizienz (Laufzeit, Ressourcenbedarf).
 \end{enumerate}
 
 \end{minipage}\par\addvspace{1em}
 
 \section{Aufbau des Berichts}
 
-Der weitere Bericht folgt den wesentlichen Verarbeitungsschritten und
-Fragestellungen des Projekts. Kapitel~\ref{ch:architektur} gibt zunächst einen
-Überblick über die Systemarchitektur, die eingesetzten Technologien und den
-Aufbau der Verarbeitungspipeline.
+Der weitere Bericht folgt dem Aufbau der Verarbeitungspipeline.
+Kapitel~\ref{ch:architektur} gibt einen Überblick über Systemarchitektur,
+eingesetzte Technologien und die Verarbeitungspipeline.
+Kapitel~\ref{ch:dokumentenauswahl} beschreibt die Dokumentenauswahl unter dem
+gegebenen Speicherbudget, Kapitel~\ref{ch:indexierung} die Aufbereitung,
+Einbettung, Indexierung und das Retrieval der ausgewählten Artikel, und
+Kapitel~\ref{ch:rag} die lokale Antwortgenerierung im RAG-Ansatz.
 
-Anschließend beschreibt Kapitel~\ref{ch:dokumentenauswahl} die Auswahl einer
-Teilmenge der Wikipedia unter Berücksichtigung des verfügbaren Speicherbudgets.
-Kapitel~\ref{ch:indexierung} behandelt die Aufbereitung der ausgewählten
-Artikel, ihre Einbettung als dichte Vektoren sowie die Indexierung und das
-Retrieval mit OpenSearch. Darauf aufbauend wird die lokale Antwortgenerierung
-mithilfe eines Sprachmodells im Rahmen des RAG-Ansatzes erläutert.
-
-Die Umsetzung unter den Ressourcenbeschränkungen des Raspberry Pi sowie die
-dabei auftretenden technischen Herausforderungen werden anschließend im
-Deployment-Kapitel betrachtet. Die Evaluation untersucht die entwickelte
-Lösung hinsichtlich Retrieval-Qualität, Laufzeit und Ressourcenbedarf. Eine
-Anleitung zur Inbetriebnahme fasst die für die Nutzung und Reproduktion
-notwendigen Schritte zusammen.
-
-Abschließend werden die getroffenen Designentscheidungen und die Grenzen der
-Lösung diskutiert. Das Fazit fasst die Ergebnisse der Projektarbeit zusammen
-und zeigt mögliche Ansatzpunkte für zukünftige Weiterentwicklungen auf.
+Kapitel~\ref{ch:deployment} behandelt die Umsetzung auf dem Raspberry Pi und
+die dabei aufgetretenen technischen Herausforderungen,
+Kapitel~\ref{ch:evaluation} die Evaluation hinsichtlich Retrieval-Qualität,
+Laufzeit und Ressourcenbedarf, und Kapitel~\ref{ch:anleitung} die Schritte zur
+Inbetriebnahme und Reproduktion. Kapitel~\ref{ch:diskussion} und
+Kapitel~\ref{ch:fazit} schließen mit der Diskussion der Designentscheidungen
+und Grenzen sowie einer Zusammenfassung samt Ausblick.
 
 \par\endgroup

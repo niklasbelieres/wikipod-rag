@@ -24,27 +24,37 @@ sondern eine Liste von Chat-Nachrichten der Form
 als auch die Ollama-Schnittstelle (Abschnitt~\ref{sec:backend-anbindung}) dieses
 Format erwarten und der Prompt-Builder dadurch backend-unabhängig bleibt.
 
-\paragraph{System-Prompt.} Jeder Anfrage wird derselbe System-Prompt vorangestellt:
+\subsection{System-Prompt}
+
+Jeder Anfrage wird derselbe System-Prompt vorangestellt:
 
 \begin{quote}
 \ttfamily\small\raggedright
 "You are an assistant answering questions using only the Wikipedia excerpts given
-below as context. Answer using only information contained in the excerpts. If the
-excerpts do not contain enough information to answer, say so explicitly instead of
-guessing. Keep answers concise, and refer to excerpts by their [n] number when
-useful."
+below as context. Answer using only information contained in the excerpts. Every
+factual claim in your answer must be supported by a citation to the relevant excerpt
+using its [n] number. Do not cite an excerpt that does not support the claim. If the
+excerpts do not contain enough information to answer the question, say so explicitly
+instead of guessing. Keep answers concise."
 \end{quote}
 
-Der System-Prompt verfolgt damit zwei Ziele: Erstens soll das Modell seine Antwort
+Der System-Prompt verfolgt damit drei Ziele: Erstens soll das Modell seine Antwort
 ausschließlich auf den mitgelieferten Wikipedia-Kontext stützen (Grounding) und nicht
 auf im Modell selbst gespeichertes Weltwissen zurückgreifen. Zweitens wird das Modell
 explizit angewiesen, bei unzureichendem Kontext dies offen zuzugeben, anstatt eine
-Antwort zu erraten. Beide Anweisungen lassen sich nicht technisch erzwingen, sondern
-sind Instruktionen an ein instruction-getuntes Sprachmodell; ihre Wirksamkeit hängt
-entsprechend vom gewählten Modell ab (Abschnitt~\ref{sec:slm-auswahl}) und wird in
-Abschnitt~\ref{sec:beispielinteraktionen} anhand konkreter Beispiele eingeordnet.
+Antwort zu erraten. Drittens verlangt der Prompt eine Quellenangabe für jede
+faktische Aussage, statt sie -- wie in einer früheren Fassung -- nur optional
+vorzusehen. Zusätzlich zum System-Prompt erhält das Modell zwei statische
+Few-Shot-Nachrichten (\texttt{FEW\_\allowbreak{}SHOT\_\allowbreak{}MESSAGES}), die exemplarisch eine
+Frage-Antwort-Paarung mit korrekt platzierten Quellenverweisen zeigen, bevor die
+eigentliche Anfrage folgt. Keine dieser Anweisungen lässt sich technisch erzwingen,
+sondern sind Instruktionen an ein instruction-getuntes Sprachmodell; ihre Wirksamkeit
+hängt entsprechend vom gewählten Modell ab (Abschnitt~\ref{sec:slm-auswahl}) und wird
+in Abschnitt~\ref{sec:beispielinteraktionen} anhand konkreter Beispiele eingeordnet.
 
-\subsubsection*{Kontextformatierung und Quellenattribution} Die erhaltenen Chunks
+\subsection{Kontextformatierung und Quellenattribution}
+
+Die erhaltenen Chunks
 werden über \texttt{format\_context()} zu einem nummerierten, quellenattributierten
 Textblock zusammengesetzt:
 
@@ -64,7 +74,9 @@ System-Prompt einzelne Aussagen im Fließtext auf eine konkrete Quelle zurückzu
 nachvollziehbar, ersetzt jedoch keine Prüfung, ob das Modell die Quellenangabe auch
 korrekt zuordnet.
 
-\paragraph{Kontext-Budget.} Da erhaltenen Chunks in der Summe das Kontextfenster des
+\subsection{Kontext-Budget}
+
+Da erhaltenen Chunks in der Summe das Kontextfenster des
 Sprachmodells überschreiten können, begrenzt \texttt{\_\allowbreak{}fit\_\allowbreak{}to\_\allowbreak{}budget()} die
 tatsächlich in den Prompt aufgenommene Chunk-Menge auf ein Wortbudget von
 standardmäßig 800 Wörtern (\texttt{DEFAULT\_\allowbreak{}MAX\_\allowbreak{}CONTEXT\_\allowbreak{}WORDS}). Die Wortanzahl dient
@@ -84,7 +96,9 @@ Artikelauswahl aus Kapitel~\ref{ch:dokumentenauswahl}; ein einzelner, ungewöhnl
 langer Chunk verdrängt dadurch nicht automatisch alle nachfolgenden, kürzeren und
 unter Umständen ebenfalls relevanten Chunks.
 
-\paragraph{Leere Retrieval-Ergebnisse.} Liefert der Retriever keine Chunks -- etwa bei
+\subsection{Leere Retrieval-Ergebnisse}
+
+Liefert der Retriever keine Chunks -- etwa bei
 einer Anfrage zu einem nicht im Index enthaltenen Thema --, wird der Prompt dennoch
 abgesendet. An die Stelle des Kontextblocks tritt dann der feste Hinweistext
 \texttt{No relevant excerpts were found in the indexed Wikipedia subset.\allowbreak{}} Ein
@@ -181,10 +195,6 @@ nicht das bei Llama 3.2 1B beobachtete Formatierungsartefakt auf. Phi-3.5 Mini w
 trotz ausführlicherer, explizit belegter Antworten aufgrund der deutlich höheren
 Latenz nicht als Standardmodell übernommen.
 
-\todo{Vollständiger End-to-End-Lauf auf dem Edge-Case-Datensatz
-für alle drei Modelle bauen und zeige und auch die Grenzfälle aus Kapitel~\ref{ch:evaluation}}
-
-
 \section{Backend-Anbindung}
 \label{sec:backend-anbindung}
 
@@ -233,22 +243,22 @@ Entwicklung stattdessen auf das \texttt{ollama}-Backend zu wechseln.
 
 Anhand einer Anfrage aus dem regulären Evaluationsdatensatz
 (Kapitel~\ref{ch:evaluation}) lässt sich das Grounding-Verhalten des Systems
-konkret nachvollziehen. Auf die Anfrage \textit{"Which South African anti-apartheid
-activist spent 27 years in prison before becoming the country's first black
-president?"} lieferte das mit \texttt{Qwen2.\allowbreak{}5-\allowbreak{}1.\allowbreak{}5B-\allowbreak{}Instruct} generierte System die
-Antwort:
+konkret nachvollziehen. Auf die Anfrage \textit{"When and under which ruler did the
+Roman Empire become permanently divided into eastern and western parts?"} lieferte
+das mit \texttt{Qwen2.\allowbreak{}5-\allowbreak{}1.\allowbreak{}5B-\allowbreak{}Instruct} generierte System die Antwort:
 
 \begin{quote}
 \itshape
-Nelson Rolihlahla Mandela spent 27 years in prison before becoming the country's
-first black president.
+The Roman Empire was permanently divided into eastern and western parts under the
+reign of Emperor Theodosius I in 395.
 \end{quote}
 
-Die Antwort entspricht dabei nahezu wörtlich einer Formulierung aus dem extrahierten
-Wikipedia-Artikel zu Nelson Mandela, dem gemäß Evaluationsdatensatz auch tatsächlich
-relevanten Ground-Truth-Artikel. Sie belegt damit, dass das Modell die Antwort aus dem
-im Prompt bereitgestellten Kontext übernimmt, statt auf einen aus dem Vortraining
-stammenden, nicht mit einer Quelle belegten Wissensstand zurückzugreifen.
+Die Antwort benennt sowohl das konkrete Jahr als auch den namentlich richtigen
+Kaiser und entspricht damit inhaltlich dem im Evaluationsdatensatz als relevant
+hinterlegten Artikel \textit{List of Roman emperors}. Sie belegt damit, dass das
+Modell die Antwort aus dem im Prompt bereitgestellten Kontext übernimmt, statt auf
+einen aus dem Vortraining stammenden, nicht mit einer Quelle belegten Wissensstand
+zurückzugreifen.
 
 Für den in der Aufgabenstellung ebenfalls geforderten negativen Fall -- eine Anfrage zu
 einem nicht im indexierten Bestand enthaltenen Thema -- enthält der in
