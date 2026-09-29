@@ -20,7 +20,7 @@ der inhaltliche Zusammenhang der jeweiligen Passage erhalten bleibt.
 
 Innerhalb eines Abschnitts werden die Texte mit einer maximalen Größe von 250 Wörtern und einer
 Überlappung von 40 Wörtern unterteilt. Die Chunk-Größe ist dabei ein Kompromiss zwischen der Granularität
-des Retrievals und ausreichendem Kontext pro Chunk, da die optimale Größe laut Literatur von der
+des Retrievals und ausreichendem Kontext pro Chunk. Da die optimale Größe laut Literatur von der
 Charakteristik der Daten, der konkreten Retrieval-Aufgabe und dem verwendeten Embedding-Modell abhängt und
 sich nicht allgemein festlegen lässt~\cite{bhat2025rethinkingchunksizelongdocument}, wurde sie für diesen
 Wikipedia-Korpus und das nachfolgende Retrieval pragmatisch festgelegt. Die Überlappung verhindert
@@ -36,7 +36,7 @@ der abgerufenen Textpassagen im Prompt kenntlich zu machen und eine Quellenattri
 \section{Embedding-Modell}
 \label{sec:embedding-modell}
 
-Als Embedding-Modell kommt \texttt{sentence-\allowbreak{}transformers/\allowbreak{}all-\allowbreak{}MiniLM-\allowbreak{}L6-\allowbreak{}v2} zum Einsatz, welches jeden
+Als Embedding-Modell kommt \texttt{...} zum Einsatz, das jeden
 Chunk-Text auf einen 384-dimensionalen dichten Vektor abbildet~\cite{minilm-model-card}. Mit 22,7 Millionen
 Parametern ist es deutlich kleiner als vergleichbare Modelle wie \texttt{all-mpnet-base-v2}. Die offizielle
 Dokumentation der \texttt{sentence-\allowbreak{}transformers}-Bibliothek beschreibt \texttt{all-MiniLM-L6-v2} als
@@ -76,7 +76,7 @@ Als \texttt{space\_type} wird \texttt{cosinesimil} verwendet, definiert als
 $d(x,y) = 1-\cos\theta = 1 - \frac{x\cdot y}{|x|\cdot|y|}$~\cite{opensearch-spaces}. Da die im Embedding-Schritt (Abschnitt~\ref{sec:embedding-modell})
 erzeugten Vektoren bereits L2-normalisiert sind ($|x|=|y|=1$), reduziert sich diese Distanzfunktion auf ein einfaches Skalarprodukt.
 
-Die HNSW-Parameter \texttt{ef\_construction} und \texttt{m} werden im Mapping nicht explizit gesetzt und laufen damit auf den \texttt{nmslib}-Standardwerten
+Die HNSW-Parameter \texttt{ef\_construction} und \texttt{m} werden im Mapping nicht explizit gesetzt und verwenden damit die \texttt{nmslib}-Standardwerte
 $\texttt{ef\_construction}=100$, $m=16$~\cite{opensearch-methods-engines}. Höhere Werte würden laut Dokumentation einen genaueren Graphen bei langsamerer
 Indexierungsgeschwindigkeit (\texttt{ef\_construction}) bzw. höherem Speicherverbrauch ($m$) erkaufen. 
 

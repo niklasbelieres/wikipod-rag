@@ -47,8 +47,8 @@ faktische Aussage, statt sie -- wie in einer früheren Fassung -- nur optional
 vorzusehen. Zusätzlich zum System-Prompt erhält das Modell zwei statische
 Few-Shot-Nachrichten (\texttt{FEW\_\allowbreak{}SHOT\_\allowbreak{}MESSAGES}), die exemplarisch eine
 Frage-Antwort-Paarung mit korrekt platzierten Quellenverweisen zeigen, bevor die
-eigentliche Anfrage folgt. Keine dieser Anweisungen lässt sich technisch erzwingen,
-sondern sind Instruktionen an ein instruction-getuntes Sprachmodell; ihre Wirksamkeit
+eigentliche Anfrage folgt. Keine dieser Anweisungen lässt sich technisch erzwingen;
+es handelt sich vielmehr um Instruktionen an ein instruction-getuntes Sprachmodell. Ihre Wirksamkeit
 hängt entsprechend vom gewählten Modell ab (Abschnitt~\ref{sec:slm-auswahl}) und wird
 in Abschnitt~\ref{sec:beispielinteraktionen} anhand konkreter Beispiele eingeordnet.
 
@@ -76,7 +76,7 @@ korrekt zuordnet.
 
 \subsection{Kontext-Budget}
 
-Da erhaltenen Chunks in der Summe das Kontextfenster des
+Da die erhaltenen Chunks in der Summe das Kontextfenster des
 Sprachmodells überschreiten können, begrenzt \texttt{\_\allowbreak{}fit\_\allowbreak{}to\_\allowbreak{}budget()} die
 tatsächlich in den Prompt aufgenommene Chunk-Menge auf ein Wortbudget von
 standardmäßig 800 Wörtern (\texttt{DEFAULT\_\allowbreak{}MAX\_\allowbreak{}CONTEXT\_\allowbreak{}WORDS}). Die Wortanzahl dient
@@ -215,8 +215,8 @@ zwischen den Backends unterscheiden muss. Welches Backend verwendet wird, legt
     vorgesehenen Deployment: In \texttt{config/prod.yaml} ist ausschließlich dieses
     Backend konfiguriert.
     \item \texttt{'ollama'}: Spricht stattdessen per HTTP einen laufenden
-    Ollama-Daemon an (\texttt{POST /api/chat}) und übergibt Nachrichtenliste sowie
-    Generierungsparameter als JSON-Body. Da für dieses Backend lediglich
+    Ollama-Daemon an (\texttt{POST /api/chat}) und übergibt die Nachrichtenliste sowie
+    die Generierungsparameter als JSON-Body. Da für dieses Backend lediglich
     \texttt{ollama pull <modell>} statt eines manuellen GGUF-Downloads und Kompilierens
     von \texttt{llama-cpp-python} nötig ist, wird es in \texttt{config/dev.yaml} und
     \texttt{config/\allowbreak{}pi-\allowbreak{}test.\allowbreak{}yaml} für die lokale Entwicklung beziehungsweise einen

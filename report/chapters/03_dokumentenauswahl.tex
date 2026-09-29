@@ -18,7 +18,7 @@ einer ZIM-Datei vorliegen, Metadaten extrahieren zu können, müssen diese
 Dokumente zunächst normalisiert und bereinigt
 werden.
 
-Hierzu existiert innerhalb der Pipeline das Modul \texttt{analysis}. Resultierend werden artikelweise folgende
+Hierzu existiert innerhalb der Pipeline das Modul \texttt{analysis}. Dabei werden artikelweise folgende
 Metadaten extrahiert:
 
 \begin{itemize}
@@ -35,8 +35,6 @@ Metadaten extrahiert:
 Die Aufrufszahlen der einzelnen Artikel erhalten wir durch die Aggregation von durch Wikimedia bereitgestellten Pageview-Dumps~\cite{wikimedia-pageviews}, welche
 über einen Zeitraum eines vorher konfigurierten Tages gesammelt und anhand der Artikeltitel, welche im Vorhinein normalisiert wurden, eindeutig
 zugeordnet werden können.
-Zusätzlich zu den oben aufgeführten Metadaten aggregieren wir die Anzahl der Aufrufe eines Artikels an einem vorher konfigurierten Tag mithilfe von Wikimedia-Pageview-Dumps, 
-welche mithilfe von vorher normalisierten Titeln mit den eigentlichen Artikeln verknüpft werden können.
 
 Die einzelnen Metadaten können anhand einer Konfigurationsdatei verschieden gewichtet werden, um je nach Priorisierung unterschiedliche Ergebnisse im Scoring zu erzielen.
 
@@ -142,11 +140,11 @@ aufgegriffen wird.
 Das in der Aufgabenstellung definierte Ziel, eine Dokumentenauswahl anhand eines gegebenen Speicherbudgets
 umzusetzen, haben wir als 0/1-Knapsack-Problem modelliert: Jeder Artikel besitzt einen durch die
 Scoring-Funktion berechneten 'Wert' und ein 'Gewicht' (Byte-Größe \texttt{html\_size\_bytes}). Ziel ist die 
-Auswahl einer Teilmenge, sodass der Gesamtwert maximiert wird, ohne aber das Gewichtslimit (hier Speicherbudget)
+Auswahl einer Teilmenge, sodass der Gesamtwert maximiert wird, ohne das Gewichtslimit (hier Speicherbudget)
 zu überschreiten.
 
 Das 0/1-Knapsack-Problem ist in einer exakten Form NP-hart, was hier bedeutet, dass eine optimale Lösung bei einer Dokumentenbasis
-dieser Größenordnung nicht praktikabel berechenbar ist. Allerdings ist eine Approximation durch
+dieser Größenordnung nicht praktikabel berechenbar ist. Allerdings ist eine Approximation durch die
 Nutzung der Greedy-Heuristik möglich. Hierbei wird für jeden Artikel das Verhältnis von Score zu 
 Byte-Größe ('Score pro Byte') berechnet, die Artikel werden absteigend danach sortiert und in dieser Reihenfolge
 ausgewählt, bis das Budget ausgeschöpft ist. Diese Heuristik liefert zwar keine nachweislich optimale

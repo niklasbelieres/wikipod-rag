@@ -2,7 +2,7 @@ import math
 
 
 def recall_at_k(retrieved_ids: list, relevant_ids: set, k: int) -> float:
-    """Anteil der relevant_ids, die unter den ersten k retrieved_ids auftauchen."""
+    """Proportion of relevant_ids that appear among the first k retrieved_ids."""
     if not relevant_ids:
         return 0.0
 
@@ -11,7 +11,7 @@ def recall_at_k(retrieved_ids: list, relevant_ids: set, k: int) -> float:
     return found / len(relevant_ids)
 
 def precision_at_k(retrieved_ids: list, relevant_ids: set, k: int) -> float:
-    """Anteil der ersten k Treffer, die relevant sind."""
+    """Proportion of the first k retrieved results that are relevant."""
     if k <= 0:
         return 0.0
 
@@ -23,7 +23,7 @@ def precision_at_k(retrieved_ids: list, relevant_ids: set, k: int) -> float:
     return relevant_count / k
 
 def ndcg_at_k(retrieved_ids: list, relevant_ids: set, k: int) -> float:
-    """Bewertet, wie weit oben relevante Treffer unter den ersten k Ergebnissen stehen."""
+    """Evaluates how highly relevant results are ranked among the first k results."""
     if k <= 0 or not relevant_ids:
         return 0.0
 
@@ -44,7 +44,7 @@ def ndcg_at_k(retrieved_ids: list, relevant_ids: set, k: int) -> float:
     return dcg / idcg
 
 def reciprocal_rank(retrieved_ids: list, relevant_ids: set) -> float:
-    """1/Rang des ersten relevanten Treffers in retrieved_ids, 0.0 falls keiner drin ist."""
+    """1/rank of the first relevant result in retrieved_ids, or 0.0 if none is found."""
     for rank, id in enumerate(retrieved_ids, start=1):
         if id in relevant_ids:
             return 1 / rank
@@ -54,7 +54,7 @@ def reciprocal_rank(retrieved_ids: list, relevant_ids: set) -> float:
 
 
 def mean_reciprocal_rank(all_retrieved: list[list], all_relevant: list[set]) -> float:
-    """Durchschnitt von reciprocal_rank über mehrere Queries (Listen gleicher Länge)."""
+    """Average reciprocal rank across multiple queries (lists of equal length)."""
     if not all_retrieved:
         return 0.0
     

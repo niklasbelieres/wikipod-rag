@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 MAX_RETRIEVAL_CANDIDATES = 1000
 
 def load_eval_dataset(path) -> list[dict]:
-    """Lädt die Query/relevant_titles-Paare aus der JSON/YAML-Datei."""    
+    """Loads the query/relevant_titles pairs from the JSON/YAML file."""
     if not path.exists():
         return []
     with path.open("r", encoding="utf-8") as fh:
@@ -107,8 +107,11 @@ def run_eval(
 
     queries = [elem["query"] for elem in dataset]
     categories = [elem.get("category", "uncategorized") for elem in dataset]
-    # recall_at_k/reciprocal_rank erwarten relevant_ids als set (Mitgliedschaftstest);
-    # im Dataset sind es Listen, daher hier explizit konvertieren.
+    """
+    recall_at_k and reciprocal_rank expect relevant_ids as a set for
+    membership tests. The dataset stores them as lists, so they are
+    explicitly converted here.
+    """
     relevant_title_sets = [set(elem["relevant_titles"]) for elem in dataset]
 
     retrieval_queries = [
@@ -144,12 +147,16 @@ def run_eval(
 
         llm_judge_results.append(query_judge_results)
 
+    """
+    Call both functions separately for each query: both are defined
+    for exactly one query (see signatures in metrics.py).
 
-    # Pro Query einzeln aufrufen: beide Funktionen sind für genau eine Query
-    # definiert (siehe Signaturen in metrics.py).
-    # strict=True ueberall: alle vier Listen sind per Konstruktion (Listcomps
-    # ueber dasselbe `dataset`) gleich lang. Ein Laengen-Mismatch waere ein
-    # Bug, den strict=True als ValueError sichtbar macht statt ihn zu verschlucken.
+    strict=True is used throughout: all four lists are guaranteed to have
+    the same length by construction (list comprehensions over the same dataset).
+    A length mismatch would indicate a bug, which strict=True exposes as a
+    ValueError instead of silently ignoring it.
+    """
+
     recall_at_k_values = [
         recall_at_k(retrieved, relevant, k)
         for retrieved, relevant in zip(retrieved_titles, relevant_title_sets, strict=True)
