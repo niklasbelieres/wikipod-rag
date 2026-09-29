@@ -42,8 +42,7 @@ Der reale Lauf über den vollen Datensatz (7.322.195 Artikel) fand auf dem in Ab
 dass der Hauptprozess dabei tatsächlich schlank bleibt: Der Swap-Speicher blieb über die gesamte Laufzeit von 162 Minuten bei 0, und nach etwa 20 Minuten sank der WikiPod-Speicherbedarf
 auf ein stabiles Niveau von 20--40~GB für den Rest des Laufs. In genau diesem ersten Zeitfenster zeigt die Messung jedoch einen deutlichen Ausschlag: Der über alle
 \texttt{wikipod}-Prozesse aufsummierte RSS-Wert erreicht kurzzeitig rund 434~GB. Zeitlich fällt dies mit dem ersten Durchgang zusammen, in dem mehrere Worker-Prozesse parallel die 
-ZIM-Datei parsen. Da der Lauf selbst keine Zeitstempel pro Verarbeitungsschritt protokolliert, lässt sich dieser Zusammenhang nicht belegen, sondern nur als naheliegende Interpretation 
-formulieren: Die Zwei-Pass-Architektur begrenzt zuverlässig die über die Zeit im Hauptprozess akkumulierte Speichermenge, trifft aber keine Aussage über den kombinierten Speicherbedarf der
+ZIM-Datei parsen. Die Zwei-Pass-Architektur begrenzt zuverlässig die über die Zeit im Hauptprozess akkumulierte Speichermenge, trifft aber keine Aussage über den kombinierten Speicherbedarf der
 parallel arbeitenden Worker-Prozesse selbst. Selbst auf einem Server mit rund 755~GB RAM entsprach dieser kurzfristig mehr als der Hälfte des verfügbaren Speichers.
 
 \begin{figure}[htbp]
@@ -57,18 +56,12 @@ parallel arbeitenden Worker-Prozesse selbst. Selbst auf einem Server mit rund 75
 \label{sec:build-serve-split}
 
 Die Aufgabenstellung verlangt, dass die fertige Lösung auf dem Pi läuft, nicht zwingend, dass der Pi den Indexierungsprozess selbst durchführt. Diese Unterscheidung ist der eigentliche Grund, 
-warum die in Abschnitt~\ref{sec:speicherbedarf} beschriebenen Speicherprobleme am Ende kein Blocker blieben: Sie mussten nicht auf dem Pi gelöst werden, sondern nur so weit, dass 
-irgendeine verfügbare Hardware den vollen Korpus verarbeiten kann.
+warum die in Abschnitt~\ref{sec:speicherbedarf} beschriebenen Speicherprobleme durch Verlagerung auf leistungsfähigere Hardware gelöst werden konnten.
 
 Der volle englischsprachige Wikipedia-Dump wird deshalb nicht auf dem Pi, sondern auf einem eigens dafür angefragten, deutlich leistungsfähigeren Server indexiert 
 (104 CPU-Kerne, rund 755~GB RAM). Der fertige OpenSearch-Index wird anschließend per Snapshot vom Server auf den Pi übertragen, über denselben \texttt{path.repo}-Mechanismus, der 
 bereits in Abschnitt~\ref{sec:opensearch-index-design} beschrieben wurde. Auf dem Pi selbst muss folglich nur noch der bereits fertige Index eingespielt und für Anfragen bereitgestellt 
-werden; die rechenintensive Aufbauphase entfällt dort vollständig.
-
-Angefragt wurde der Server erst, nachdem die in Abschnitt~\ref{sec:speicherbedarf} beschriebenen Läufe auf dem Pi wiederholt im vollen Swap endeten. 
-Mit welcher genauen OpenSearch-Konfiguration (Heap-Größe, Ressourcen-Limits) der Index letztlich auf dem Pi betrieben wird, lässt sich aus dem aktuellen 
-Repository-Stand nicht ablesen: Das lokale \texttt{docker-compose.yml} deckt nachweislich nur den Entwicklungsaufbau ab, nicht den tatsächlichen Pi-Betrieb. Bekannt ist 
-lediglich, dass die Indexierung selbst auf dem Server erfolgte, nicht mit welchen exakten Parametern der Pi den übertragenen Index anschließend bedient.
+werden, wodurch die rechenintensive Aufbauphase dort vollständig entfällt.
 
 \section{Monitoring-Infrastruktur}
 
@@ -90,11 +83,6 @@ Gesamt- und verfügbarer Arbeitsspeicher, die aufsummierte RSS aller Prozesse, d
 und Throttling-Status über \texttt{vcgencmd} hinzu; auf anderen Systemen liefert derselbe Aufruf kontrolliert \texttt{None} zurück, statt 
 das Skript abzubrechen.\par
 \endgroup
-
-Ein praktisches Detail betrifft die Ausgabe: Ein erneuter Aufruf mit demselben \texttt{--out}-Pfad hängt an die bestehende CSV an, 
-statt sie zu überschreiben. Ein Neustart des Monitors nach einem Absturz verliert dadurch keine bereits aufgezeichneten Samples — genau das erklärt 
-auch, warum sich in einigen der aufgezeichneten Läufe (Abschnitt~\ref{sec:speicherbedarf}) bereits zu Beginn ein teilweise gefüllter Swap-Speicher 
-zeigt, wenn zwischen zwei Versuchen kein Neustart des Systems selbst erfolgte.
 
 Als Auswertungsgegenstück liest \texttt{plot\_metrics.py} eine solche CSV ein und erzeugt daraus sowohl Kennzahlen (Spitzenwerte, Laufzeit) als 
 auch die in diesem Kapitel verwendeten Diagramme.

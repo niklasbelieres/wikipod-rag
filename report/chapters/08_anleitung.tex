@@ -221,56 +221,6 @@ Testläufe steht beispielsweise die Konfiguration
 Raspberry Pi durchgeführt werden, ohne die Standardkonfiguration für die
 Entwicklung zu verändern.
 
-\subsection{Vollständigen Index per Snapshot übertragen}
-
-Für den vollständigen Korpus wurde der Index auf dem Server erstellt und
-anschließend auf den Pi übertragen. Auf dem Pi \texttt{swl-rp01} ist das
-Dateisystem-Repository \texttt{wikipod\_repo} unter
-\path{/usr/share/opensearch/snapshots} registriert. Es enthält den Snapshot
-\texttt{snap\_1}, der am 2. September 2026 mit OpenSearch 2.17.0 erfolgreich
-erstellt wurde. Neben \texttt{wikipod-\allowbreak{}chunks-\allowbreak{}server} enthält dieser Snapshot
-Systemindizes und den globalen Clusterzustand
-(\texttt{include\_\allowbreak{}global\_\allowbreak{}state: true}).
-
-Der folgende Ablauf beschreibt eine erneute Wiederherstellung ausschließlich
-des Projektindex. Er wurde noch nicht praktisch geprüft und dokumentiert
-nicht die damaligen Kopier- und Restore-Befehle. Welche zusätzlichen
-Bestandteile beim ursprünglichen Restore übernommen wurden, ist nicht belegt.
-
-\begin{enumerate}
-    \item Für eine erneute Wiederherstellung eine separate OpenSearch-2.17.0-
-    Testinstanz verwenden. Die Compose-Datei bindet \texttt{./snapshots}
-    unter \path{/usr/share/opensearch/snapshots} ein und setzt
-    \texttt{path.repo}. Der OpenSearch-Prozess benötigt passende Dateirechte.
-    \item Das vollständige Snapshot-Repository in dieses Verzeichnis auf
-    dem Zielrechner kopieren. Quellrechner, Quellpfad und Übertragungsweg
-    müssen für den jeweiligen Aufbau festgelegt werden. Während der Kopie
-    darf das Quell-Repository nicht verändert werden.
-    \item Auf der Zielinstanz über \path{PUT /_snapshot/wikipod_repo} ein
-    Repository vom Typ \texttt{fs} mit dem Containerpfad als
-    \texttt{settings.location} und \texttt{settings.\allowbreak{}readonly: true}
-    registrieren. Über \path{GET /_snapshot/wikipod_repo/snap_1} prüfen,
-    dass der Snapshot verfügbar ist und den Zustand \texttt{SUCCESS} hat.
-    \item Über \path{POST /_snapshot/wikipod_repo/snap_1/_restore} den
-    Projektindex wiederherstellen. Im Request ausdrücklich
-    \texttt{indices: "wikipod-\allowbreak{}chunks-\allowbreak{}server"} und
-    \texttt{include\_\allowbreak{}global\_\allowbreak{}state: false} setzen. Damit werden für diesen
-    Ablauf die Systemindizes und der globale Zustand nicht übernommen.
-    Auf der Zielinstanz darf kein gleichnamiger offener Index vorhanden sein.
-    \item Den Abschluss über \path{GET /_cat/recovery?v} und den
-    wiederhergestellten Index über \path{GET /_cat/indices?v} kontrollieren.
-    Den vorhandenen produktiven Pi-Index für diese Prüfung nicht ersetzen.
-\end{enumerate}
-
-Die API-Details beschreibt die
-\href{https://docs.opensearch.org/2.17/tuning-your-cluster/availability-and-recovery/snapshots/snapshot-restore/}{OpenSearch-Dokumentation zu Snapshots}.
-In der WikiPod-Konfiguration auf dem Pi muss
-\texttt{opensearch.\allowbreak{}index\_\allowbreak{}name} anschließend auf den wiederhergestellten
-Index zeigen. \texttt{prod} verwendet aktuell
-\texttt{wikipod-\allowbreak{}chunks-\allowbreak{}server}. Danach zunächst eine Anfrage mit
-\texttt{--chunks-only} ausführen. Ein anschließender Aufruf von
-\texttt{index -\allowbreak{}-\allowbreak{}recreate-\allowbreak{}index} würde den wiederhergestellten Index löschen.
-
 \subsection{Offline-Betrieb vorbereiten}
 
 Python-Abhängigkeiten, Docker-Image, Embedding-Modell und Sprachmodell müssen
