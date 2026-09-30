@@ -153,12 +153,12 @@ begrenzte Antwort -- diesen Spielraum überhaupt ausschöpfen würde. Auf der
 CPU-only-Zielhardware wird das konfigurierte Kontextfenster somit bewusst klein
 gehalten.
 
-Die eigentliche Generierungslatenz der drei Modelle auf dem Raspberry Pi wurde bereits
-in Kapitel~\ref{ch:evaluation} (Tabelle~\ref{tab:pi-generation-latency}) im Rahmen
-der Effizienzevaluation gemessen und dort ausführlich diskutiert: Qwen2.5 1.5B und
-Llama 3.2 1B lagen mit rund 28 beziehungsweise 29 Sekunden mittlerer Latenz pro
-Anfrage nah beieinander, während Phi-3.5 Mini mit über 150 Sekunden deutlich
-langsamer war. Dieser Abschnitt konzentriert sich daher ergänzend auf die
+Die Generierungslatenz der drei Modelle auf dem Raspberry Pi wird in
+Kapitel~\ref{ch:evaluation} (Tabelle~\ref{tab:pi-generation-latency}) im Rahmen
+der Effizienzevaluation gemessen, jeweils über das \texttt{llama\_cpp}-Backend:
+Qwen2.5 1.5B und Llama 3.2 1B lagen mit rund 28 beziehungsweise 29 Sekunden
+mittlerer Latenz pro Anfrage nah beieinander, während Phi-3.5 Mini mit über
+150 Sekunden deutlich langsamer war. Dieser Abschnitt konzentriert sich daher ergänzend auf die
 Antwortqualität, da für den in Kapitel~\ref{ch:evaluation} dokumentierten
 Modellvergleich bewusst keine quantitative Qualitätsmetrik erhoben wurde.
 
@@ -168,19 +168,22 @@ Unterschiede im Umgang mit dem im System-Prompt geforderten Antwortstil. Auf die
 Anfrage \textit{"Which music group did Michael Jackson perform with before becoming a
 successful solo artist?"} antwortete Qwen2.5 1.5B mit \texttt{The Jackson 5} -- knapp
 und ohne überflüssige Ausführungen, wie es der System-Prompt (\texttt{Keep answers
-concise}) vorgibt. Phi-3.5 Mini beantwortete dieselbe Anfrage inhaltlich korrekt,
-jedoch deutlich ausführlicher und mit explizit in den Fließtext eingebundenen
-Quellenverweisen (\textit{"According to the information provided in excerpts [1] and
-[2], Michael Jackson performed with The Jackson 5 [...]"}). Llama 3.2 1B lieferte für
-dieselbe Anfrage eine inhaltlich ebenfalls korrekte Antwort, die jedoch mit der
-unverändert aus dem Kontextblock übernommenen Nummerierung \texttt{[1]} beginnt
-(\textit{"[1] The Jackson 5, later known as The Jacksons, was an American pop band
-[...]"}), anstatt den Quellenverweis wie vom System-Prompt vorgesehen in den
-Antworttext zu integrieren. Ein vergleichbares Muster zeigt sich bei der Anfrage nach
-dem südafrikanischen Anti-Apartheid-Aktivisten, der 27 Jahre im Gefängnis saß, bevor
-er ins Präsidentenamt gewählt wurde: Llama 3.2 1B beantwortete auch diese Anfrage mit
-vorangestelltem \texttt{[1]}, während Qwen2.5 1.5B inhaltlich nahezu identisch, aber
-ohne diesen Formatierungsartefakt antwortete.
+concise}) vorgibt, allerdings auch ohne die laut System-Prompt für jede Aussage
+verpflichtende Quellenangabe. Phi-3.5 Mini beantwortete dieselbe Anfrage inhaltlich
+korrekt und, als einziges der drei Modelle, mit den geforderten, explizit in den
+Fließtext eingebundenen Quellenverweisen (\textit{"According to the information
+provided in excerpts [1] and [2], Michael Jackson performed with The Jackson 5
+[...]"}) -- dafür deutlich ausführlicher, als es \texttt{Keep answers concise}
+nahelegt. Llama 3.2 1B lieferte für dieselbe Anfrage eine inhaltlich ebenfalls
+korrekte Antwort, die jedoch mit der unverändert aus dem Kontextblock übernommenen
+Nummerierung \texttt{[1]} beginnt (\textit{"[1] The Jackson 5, later known as The
+Jacksons, was an American pop band [...]"}), anstatt den Quellenverweis wie vom
+System-Prompt vorgesehen in den Antworttext zu integrieren. Ein vergleichbares Muster
+zeigt sich bei der Anfrage nach dem südafrikanischen Anti-Apartheid-Aktivisten, der 27
+Jahre im Gefängnis saß, bevor er ins Präsidentenamt gewählt wurde: Llama 3.2 1B
+beantwortete auch diese Anfrage mit vorangestelltem \texttt{[1]}, während Qwen2.5 1.5B
+inhaltlich nahezu identisch antwortete -- wiederum ohne den Formatierungsartefakt,
+aber auch hier ohne Quellenangabe.
 
 Diese Beobachtungen beruhen auf einer kleinen, nicht systematisch ausgewerteten
 Stichprobe einzelner Antworten und ersetzen keine quantitative Qualitätsbewertung;
@@ -191,9 +194,12 @@ qualitativen Beobachtungen wurde \texttt{Qwen2.\allowbreak{}5-\allowbreak{}1.\al
 Kapitel~\ref{ch:evaluation} die niedrigste gemessene Generierungslatenz der drei
 Kandidaten, produzierte in der hier beschriebenen Stichprobe durchgehend prägnante,
 inhaltlich mit den beiden anderen Modellen übereinstimmende Antworten und wies dabei
-nicht das bei Llama 3.2 1B beobachtete Formatierungsartefakt auf. Phi-3.5 Mini wurde
-trotz ausführlicherer, explizit belegter Antworten aufgrund der deutlich höheren
-Latenz nicht als Standardmodell übernommen.
+nicht das bei Llama 3.2 1B beobachtete Formatierungsartefakt auf. Anders als Phi-3.5
+Mini hielt sich Qwen2.5 1.5B in der Stichprobe allerdings nicht zuverlässig an die im
+System-Prompt verpflichtend geforderte Quellenangabe je Aussage -- ein Kompromiss
+zugunsten der Latenz, den die aktuelle Konfiguration bewusst in Kauf nimmt. Phi-3.5
+Mini wurde trotz ausführlicherer, in der Stichprobe konsequent quellenbelegter
+Antworten aufgrund der deutlich höheren Latenz nicht als Standardmodell übernommen.
 
 \section{Backend-Anbindung}
 \label{sec:backend-anbindung}
