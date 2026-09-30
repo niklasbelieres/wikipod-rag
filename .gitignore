@@ -44,6 +44,7 @@ config/secrets*
 *.cache
 logs/
 
+snapchots/
 # OS
 .DS_Store
 Thumbs.db
