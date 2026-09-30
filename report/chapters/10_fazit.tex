@@ -76,23 +76,22 @@ umgesetzt beziehungsweise experimentell untersucht. Wikipedia-Inhalte können
 lokal bereitgestellt, unter einem vorgegebenen Speicherbudget auf eine
 Teilmenge reduziert, als dichte Vektoren in OpenSearch indexiert und für
 semantisches Retrieval mit anschließender lokaler Antwortgenerierung genutzt
-werden. Die Messungen zeigen, dass der grundsätzliche Betrieb der entwickelten
-Pipeline auf dem Raspberry Pi möglich ist. Gleichzeitig bleiben insbesondere
+werden. Der aus 1,64 Millionen Artikeln erzeugte Index läuft auf dem Raspberry
+Pi. Die Retrieval-Qualität wurde bislang allerdings nur auf dem kleinen
+Evaluationskorpus gemessen. Gleichzeitig bleiben insbesondere
 die Gewichtung des Auswahlverfahrens, die begrenzte Breite der Evaluation und
 die vergleichsweise hohe Laufzeit der lokalen Sprachmodellgenerierung als
 wesentliche Einschränkungen der aktuellen Lösung bestehen.
 
 \section{Ausblick}
 
-Ein naheliegender nächster Schritt besteht darin, die entwickelte Pipeline auf
-einem deutlich größeren Wikipedia-Bestand unter der vorgesehenen
-Zielkonfiguration zu betreiben. Die Architektur trennt die aufwendige
-Aufbereitung und Indexierung von der späteren Nutzung des Systems, sodass ein
-umfangreicher Index auf leistungsfähigerer Hardware erzeugt und anschließend
-auf den Raspberry Pi übertragen werden kann. Dadurch ließe sich untersuchen,
-wie sich die im kleinen Evaluationskorpus beobachteten Ergebnisse auf einen
-realistischeren Datenbestand übertragen und wie sich insbesondere Indexgröße,
-Speicherbedarf und Retrieval-Latenz bei wachsendem Korpus entwickeln.
+Der Index über die 1.638.375 ausgewählten Artikel wurde auf dem Server
+erzeugt und läuft auf dem Raspberry Pi (Kapitel~\ref{ch:deployment}). Die
+Retrieval-Evaluation in Kapitel~\ref{ch:evaluation} beruht dagegen auf dem
+Top-100-Korpus mit 194 Artikeln. Als nächster Schritt liegt es daher nahe,
+die Evaluationsanfragen gegen den vollen Index auszuführen. Erst dann zeigt
+sich, ob Recall und MRR auch halten, wenn ein um Größenordnungen größerer
+Bestand ähnlicher Chunks um die vorderen Ränge konkurriert.
 Weiteres Verbesserungspotenzial besteht bei der Dokumentenauswahl. Die
 Evaluation des Scoring-Verfahrens hat gezeigt, dass die tatsächlichen Beiträge
 der verwendeten Signale nicht unmittelbar ihren konfigurierten Gewichten

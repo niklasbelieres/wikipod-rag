@@ -208,18 +208,56 @@ WIKIPOD_ENV=dev python -m wikipod.cli index --recreate-index
 \section{Deployment auf dem Raspberry Pi}
 
 Für den Betrieb auf dem Raspberry Pi wird das Repository zunächst auf das
-Gerät übertragen und analog zur lokalen Installation eingerichtet. Die
-Wikipedia-ZIM-Datei muss auf dem lokalen Speichermedium des Raspberry Pi
-vorliegen und der entsprechende Pfad in der dafür vorgesehenen
-Konfiguration eingetragen werden.
+Gerät übertragen und analog zur lokalen Installation eingerichtet.
 
-OpenSearch wird auch auf dem Raspberry Pi über Docker Compose betrieben.
-Nach dem Start von OpenSearch kann die Indexierung mit der für den jeweiligen
-Versuch vorgesehenen Konfiguration ausgeführt werden. Für Pi-spezifische
-Testläufe steht beispielsweise die Konfiguration
-\texttt{config/\allowbreak{}pi-\allowbreak{}test.\allowbreak{}yaml} zur Verfügung. Dadurch können Experimente auf dem
-Raspberry Pi durchgeführt werden, ohne die Standardkonfiguration für die
-Entwicklung zu verändern.
+Auf dem Raspberry Pi selbst wird für den produktiven Volltextindex kein
+Index aufgebaut: Der auf dem Server erzeugte Index wird als
+OpenSearch-Snapshot übertragen und dort wiederhergestellt (siehe die
+Begründung dieser Trennung in Abschnitt~\ref{sec:build-serve-split}).
+Voraussetzung ist, dass auf beiden Systemen \texttt{path.repo} auf ein
+Snapshot-Verzeichnis zeigt; bei Docker Compose geschieht das über eine
+entsprechende Umgebungsvariable und ein gemountetes Volume.
+
+Auf dem Server wird zunächst das Snapshot-Repository registriert und
+anschließend ein Snapshot des Index erstellt:
+
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
+\begin{lstlisting}[language=bash]
+curl -X PUT localhost:9200/_snapshot/wikipod_repo \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"fs","settings":{"location":"/usr/share/opensearch/snapshots"}}'
+
+curl -X PUT "localhost:9200/_snapshot/wikipod_repo/snap_1?wait_for_completion=true" \
+  -H 'Content-Type: application/json' \
+  -d '{"indices":"wikipod-chunks-server"}'
+\end{lstlisting}
+\end{minipage}\par\smallskip
+
+Anschließend wird das Snapshot-Verzeichnis auf den Pi kopiert, dort dasselbe
+Repository registriert und der Index wiederhergestellt:
+
+\par\nopagebreak[4]\smallskip
+\noindent\begin{minipage}[t]{\linewidth}
+\vspace{0pt}
+\begin{lstlisting}[language=bash]
+curl -X POST localhost:9200/_snapshot/wikipod_repo/snap_1/_restore \
+  -H 'Content-Type: application/json' \
+  -d '{"indices":"wikipod-chunks-server"}'
+\end{lstlisting}
+\end{minipage}\par\smallskip
+
+Indexname und Embedding-Modell in \texttt{config/\allowbreak{}prod.\allowbreak{}yaml} müssen mit dem
+Server-Lauf übereinstimmen, da sonst Query- und Chunk-Vektoren nicht
+zusammenpassen.
+
+Unabhängig davon steht für kleinere, testweise Indexierungsläufe direkt auf
+dem Pi -- nicht für den oben beschriebenen produktiven Volltextindex -- die
+Konfiguration \texttt{config/\allowbreak{}pi-\allowbreak{}test.\allowbreak{}yaml} zur Verfügung. Auch hierfür muss
+die verwendete ZIM-Datei auf dem lokalen Speichermedium des Raspberry Pi
+vorliegen. Dadurch können Experimente auf dem Raspberry Pi durchgeführt
+werden, ohne die Standardkonfiguration für die Entwicklung zu verändern.
 
 \subsection{Offline-Betrieb vorbereiten}
 
